@@ -1,0 +1,7 @@
+*/Debug
+*/.vs
+
+*.exe
+*.pdb
+*.sdf
+
