@@ -1,5 +1,7 @@
 */Debug
 */.vs
+Ion/Ion/Debug
+Ion/Ion.VC.opendb
 
 *.exe
 *.pdb
