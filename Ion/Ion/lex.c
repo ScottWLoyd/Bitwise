@@ -1,152 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
-
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <math.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdarg.h>
-
-#define MAX(x,y) (x > y ? x : y)
-
-void* xrealloc(void* ptr, size_t num_bytes)
-{
-    ptr = realloc(ptr, num_bytes);
-    if (!ptr)
-    {
-        perror("xrealloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-
-void* xmalloc(size_t num_bytes)
-{
-    void* ptr = malloc(num_bytes);
-    if (!ptr)
-    {
-        perror("xmalloc failed");
-        exit(1);
-    }
-    return ptr;
-}
-
-static char err_buff[1024 * 1024];
-
-void fatal(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    printf("FATAL: ");
-    vprintf(fmt, args);
-    printf("\n");
-    va_end(args);
-    exit(1);
-}
-
-void syntax_error(const char* fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    printf("Syntax Error: ");
-    vprintf(fmt, args);
-    printf("\n");
-    va_end(args);
-}
-
-// Stretchy buffers
-typedef struct buf_hdr
-{
-    size_t len;
-    size_t cap;
-    char buf[0];
-} buf_hdr;
-
-#define buf__hdr(b) ((buf_hdr*)((char*)(b) - offsetof(buf_hdr, buf)))
-#define buf__fits(b, n) (buf_len(b) + (n) <= buf_cap(b))
-#define buf__fit(b, n) (buf__fits((b), (n)) ? 0 : ((b) = buf__grow((b), buf_len(b) + (n), sizeof(*(b)))))
-
-#define buf_len(b)  ((b) ? buf__hdr(b)->len : 0)
-#define buf_cap(b)  ((b) ? buf__hdr(b)->cap : 0)
-#define buf_end(b)  ((b) + buf_len(b))
-#define buf_push(b, ...) (buf__fit((b), 1), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
-#define buf_free(b) ((b) ? free(buf__hdr(b)), (b) = NULL : 0)
-
-void* buf__grow(const void* buf, size_t new_len, size_t elem_size)
-{
-    assert(buf_cap(buf) <= (SIZE_MAX - 1) / 2);
-    size_t new_cap = MAX(1 + 2 * buf_cap(buf), new_len);
-    assert(new_len <= new_cap);
-    assert(new_cap <= (SIZE_MAX - offsetof(buf_hdr, buf)) / elem_size);
-    size_t new_size = offsetof(buf_hdr, buf) + new_cap * elem_size;
-    buf_hdr* new_hdr;
-    if (buf) {
-        new_hdr = xrealloc(buf__hdr(buf), new_size);
-    }
-    else {
-        new_hdr = xmalloc(new_size);
-        new_hdr->len = 0;
-    }
-    new_hdr->cap = new_cap;
-    return new_hdr->buf;
-}
-
-void buf_test()
-{
-    int* asdf = NULL;
-    int N = 1027;
-    for (int i = 0; i<N; i++)
-        buf_push(asdf, i);
-    assert(buf_len(asdf) == N);
-    buf_free(asdf);
-}
-
-typedef struct intern_str {
-    size_t len;
-    const char* str;
-} intern;
-
-static intern* interns;
-
-const char* str_intern_range(const char* start, const char* end)
-{
-    size_t len = end - start;
-    for(intern* it = interns; it != buf_end(interns); it++)
-    {
-        if (it->len == len && strncmp(it->str, start, len) == 0)
-        {
-            return it->str;
-        }
-    }
-    char* str = malloc(len + 1);
-    memcpy(str, start, len);
-    str[len] = 0;
-    buf_push(interns, ((intern){ len, str }));
-    return str;
-}
-
-const char* str_intern(const char* str)
-{
-    return str_intern_range(str, str + strlen(str));
-}
-
-void str_intern_test()
-{
-    char x[] = "hello";
-    char y[] = "hello";
-    assert(x != y);
-    const char* px = str_intern(x);
-    const char* py = str_intern(y);
-    assert(px == py);
-    char z[] = "hello!";
-    const char* pz = str_intern(z);
-    assert(pz != px);
-}
-
 
 typedef enum TokenKind
 {
@@ -258,16 +109,16 @@ uint8_t char_to_digit[256] = {
     ['7'] = 7,
     ['8'] = 8,
     ['9'] = 9,
-    ['a'] = 10, ['A'] = 10,
-    ['b'] = 11, ['B'] = 11,
-    ['c'] = 12, ['C'] = 12,
-    ['d'] = 13, ['D'] = 13,
-    ['e'] = 14, ['E'] = 14,
-    ['f'] = 15, ['F'] = 15,
+    ['a'] = 10,['A'] = 10,
+    ['b'] = 11,['B'] = 11,
+    ['c'] = 12,['C'] = 12,
+    ['d'] = 13,['D'] = 13,
+    ['e'] = 14,['E'] = 14,
+    ['f'] = 15,['F'] = 15,
 };
 
 void scan_int()
-{    
+{
     uint64_t base = 10;
     if (*stream == '0')
     {
@@ -291,7 +142,7 @@ void scan_int()
         }
     }
     uint64_t val = 0;
-    for(;;)
+    for (;;)
     {
         uint64_t digit = char_to_digit[*stream];
         if (digit == 0 && *stream != '0')
@@ -360,7 +211,7 @@ void scan_float()
     token.float_val = val;
 }
 
-char escape_to_char[256] = 
+char escape_to_char[256] =
 {
     ['n'] = '\n',
     ['r'] = '\r',
@@ -484,7 +335,7 @@ void next_token()
     {
         stream++;
     }
-    
+
     token.start = stream;
     token.mod = 0;
     switch (*stream)
@@ -521,10 +372,10 @@ void next_token()
 
         case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g': case 'h': case 'i': case 'j':
         case 'k': case 'l': case 'm': case 'n': case 'o': case 'p': case 'q': case 'r': case 's': case 't':
-        case 'u': case 'v': case 'w': case 'x': case 'y': case 'z': 
-        case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I': case 'J': 
-        case 'K': case 'L': case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': 
-        case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z': 
+        case 'u': case 'v': case 'w': case 'x': case 'y': case 'z':
+        case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G': case 'H': case 'I': case 'J':
+        case 'K': case 'L': case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T':
+        case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
         case '_': {
             const char* start = stream;
             while (isalnum(*stream) || *stream == '_')
@@ -541,7 +392,8 @@ void next_token()
                     token.kind = TOKEN_LSHIFT_ASSIGN;
                     stream++;
                 }
-            } else if (*stream == '=') { 
+            }
+            else if (*stream == '=') {
                 token.kind = TOKEN_LTEQ;
                 stream++;
             }
@@ -561,20 +413,20 @@ void next_token()
                 stream++;
             }
         } break;
-            
-        CASE1('^', '=', TOKEN_XOR_ASSIGN)
-        CASE1(':', '=', TOKEN_COLON_ASSIGN)
-        CASE1('*', '=', TOKEN_MUL_ASSIGN)
-        CASE1('/', '=', TOKEN_DIV_ASSIGN)
-        CASE1('%', '=', TOKEN_MOD_ASSIGN)
-        CASE2('+', '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
-        CASE2('-', '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
-        CASE2('&', '=', TOKEN_AND_ASSIGN, '&', TOKEN_AND)
-        CASE2('|', '=', TOKEN_OR_ASSIGN, '|', TOKEN_OR)
-        
+
+            CASE1('^', '=', TOKEN_XOR_ASSIGN)
+                CASE1(':', '=', TOKEN_COLON_ASSIGN)
+                CASE1('*', '=', TOKEN_MUL_ASSIGN)
+                CASE1('/', '=', TOKEN_DIV_ASSIGN)
+                CASE1('%', '=', TOKEN_MOD_ASSIGN)
+                CASE2('+', '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
+                CASE2('-', '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
+                CASE2('&', '=', TOKEN_AND_ASSIGN, '&', TOKEN_AND)
+                CASE2('|', '=', TOKEN_OR_ASSIGN, '|', TOKEN_OR)
+
         default: {
-            token.kind = *stream++;
-        } break;
+                token.kind = *stream++;
+            } break;
     }
     token.end = stream;
 }
@@ -592,21 +444,21 @@ void print_token(Token token)
 {
     switch (token.kind)
     {
-    case TOKEN_INT:
-        printf("TOKEN INT: %llu\n", token.int_val);
-        break;
-    case TOKEN_FLOAT:
-        printf("TOKEN FLOAT: %f\n", token.float_val);
-        break;
-    case TOKEN_STR:
-        printf("TOKEN STRING: %s\n", token.str_val);
-        break;
-    case TOKEN_NAME:
-        printf("TOKEN NAME: %.*s\n", token.end - token.start, token.start);
-        break;
-    default:
-        printf("TOKEN: '%c'\n", token.kind);
-        break;
+        case TOKEN_INT:
+            printf("TOKEN INT: %llu\n", token.int_val);
+            break;
+        case TOKEN_FLOAT:
+            printf("TOKEN FLOAT: %f\n", token.float_val);
+            break;
+        case TOKEN_STR:
+            printf("TOKEN STRING: %s\n", token.str_val);
+            break;
+        case TOKEN_NAME:
+            printf("TOKEN NAME: %.*s\n", token.end - token.start, token.start);
+            break;
+        default:
+            printf("TOKEN: '%c'\n", token.kind);
+            break;
     }
 }
 
@@ -677,7 +529,7 @@ void lex_test()
     assert_token_float(42.);
     assert_token_float(3.13e-10);
     assert_token_eof();
-    
+
     // Char literal tests
     init_stream("'a' '\\n'");
     assert_token_int('a');
@@ -723,16 +575,3 @@ void lex_test()
 #undef assert_token_int
 #undef assert_token_name
 #undef assert_token
-
-void run_tests()
-{
-    buf_test();
-    lex_test();
-    str_intern_test();
-}
-
-int main(int ArgCount, char** Args)
-{
-    run_tests();
-    return 0;
-}
