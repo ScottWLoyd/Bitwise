@@ -1,6 +1,7 @@
 */Debug
 */.vs
 Ion/Ion/Debug
+Ion/Ion/x64
 Ion/Ion.VC.opendb
 
 *.exe

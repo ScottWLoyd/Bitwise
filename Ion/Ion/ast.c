@@ -13,7 +13,8 @@ typedef enum TypespecKind {
 } TypespecKind;
 
 typedef struct FuncTypespec {
-	BUF(Typespec*) args;
+	Typespec** args;
+    size_t num_args;
 	Typespec* ret;
 } FuncTypespec;
 
@@ -50,7 +51,7 @@ Typespec* typespec_pointer(Typespec* base)
 	return type;
 }
 
-Typespec* typespec_array(Typespec* base, int size)
+Typespec* typespec_array(Typespec* base, Expr* size)
 {
 	Typespec* type = typespec_alloc(TYPESPEC_POINTER);
 	type->base = base;
@@ -217,9 +218,10 @@ Expr* expr_cast(Typespec* type, Expr* expr) {
 	return new_expr;
 }
 
-Expr* expr_call(Expr* operand, Expr** args) {
+Expr* expr_call(Expr* operand, size_t num_args, Expr** args) {
 	Expr* new_expr = expr_alloc(EXPR_CALL);
 	new_expr->operand = operand;
+    new_expr->num_args = num_args;
 	new_expr->args = args;
 	return new_expr;
 }
@@ -272,7 +274,7 @@ void print_type(Typespec* type)
 			break;
 		case TYPESPEC_FUNC:
 			printf("(func ");
-			for (Typespec** it = type->func.args; it != buf_end(type->func.args); it++)
+			for (Typespec** it = type->func.args; it != type->func.args + type->func.num_args; it++)
 			{
 				printf(" ");
 				print_type(*it);
@@ -326,7 +328,7 @@ void print_expr(Expr* expr)
 		case EXPR_CALL:
 			printf("(");
 			print_expr(expr->operand);
-			for (Expr** it = expr->args; it != buf_end(expr->args); it++)
+			for (Expr** it = expr->args; it != expr->args + expr->num_args; it++)
 			{
 				printf(" ");
 				print_expr(*it);
@@ -382,14 +384,12 @@ void print_expr_line(Expr* expr)
 
 void expr_test() 
 {
-	Expr** fact_args = NULL;
-	buf_push(fact_args, expr_int(32));
 	Expr* exprs[] = {
 		expr_binary('+', expr_int(1), expr_int(2)),
 		expr_unary('-', expr_float(3.14)),
 		expr_ternary(expr_name("flag"), expr_str("true"), expr_str("false")),
 		expr_field(expr_name("person"), "name"),
-		expr_call(expr_name("fact"), fact_args),
+        expr_call(expr_name("fact"), 1, (Expr*[]) { expr_int(42) }),
 		expr_index(expr_field(expr_name("person"), "siblings"), expr_int(3)),
 		expr_cast(typespec_pointer(typespec_name("int")), expr_name("void_ptr")),
 	};
@@ -416,7 +416,8 @@ typedef enum StmtKind {
 } StmtKind;
 
 typedef struct StmtBlock {
-    BUF(Stmt*) stmts;
+    Stmt** stmts;
+    size_t num_stmts;
 } StmtBlock;
 
 typedef struct ElseIf {
@@ -425,7 +426,8 @@ typedef struct ElseIf {
 } ElseIf;
 
 typedef struct Case {
-	BUF(Expr*) exprs;
+	Expr** exprs;
+    size_t num_exprs;
 	StmtBlock block;
 } Case;
 
@@ -436,7 +438,8 @@ typedef struct Stmt {
     union {
 		// If
         struct {
-            BUF(ElseIf) elseifs;
+            ElseIf* elseifs;
+            size_t num_elseifs;
             StmtBlock else_block;
         };
 		// For
@@ -446,7 +449,8 @@ typedef struct Stmt {
 		};
 		// Switch
 		struct {
-			BUF(Case) cases;
+			Case* cases;
+            size_t num_cases;
 		};
 		// Auto-assign
         struct {
