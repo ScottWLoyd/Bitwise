@@ -1,4 +1,9 @@
 #define MAX(x,y) (x > y ? x : y)
+#define IS_POW2(x) (((x) != 0) && ((x) & ((x)-1)) == 0)
+#define ALIGN_DOWN(n, a) ((n) & ~((a) - 1))
+#define ALIGN_UP(n, a) ALIGN_DOWN((n) + (a) - 1, (a))
+#define ALIGN_DOWN_PTR(p, a) ((void*)ALIGN_DOWN((uintptr_t)(p), (a)))
+#define ALIGN_UP_PTR(p, a) ((void*)ALIGN_UP((uintptr_t)(p), (a)))
 
 void* xcalloc(size_t num_items, size_t item_size)
 {
@@ -33,7 +38,12 @@ void* xmalloc(size_t num_bytes)
     return ptr;
 }
 
-static char err_buff[1024 * 1024];
+void* memdup(void* src, size_t size) 
+{
+    void* dest = xmalloc(size);
+    memcpy(dest, src, size);
+    return dest;
+}
 
 void fatal(const char* fmt, ...)
 {
@@ -54,6 +64,17 @@ void syntax_error(const char* fmt, ...)
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
+}
+
+void fatal_syntax_error(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    printf("Syntax Error: ");
+    vprintf(fmt, args);
+    printf("\n");
+    va_end(args);
+    exit(1);
 }
 
 // Stretchy buffers
@@ -104,27 +125,76 @@ void buf_test()
     buf_free(asdf);
 }
 
-typedef struct intern_str {
+///////////////////////////////////////////////////////////////////////////////
+// Arena allocator
+//
+
+typedef struct Arena {
+    char* ptr;
+    char* end;
+    char** blocks;
+} Arena;
+
+#define ARENA_ALIGNMENT 8
+#define ARENA_BLOCK_SIZE 1024
+
+void arena_grow(Arena* arena, size_t min_size)
+{
+    size_t size = ALIGN_UP(MAX(ARENA_BLOCK_SIZE, min_size), ARENA_ALIGNMENT);
+    arena->ptr = xmalloc(size);
+    assert(arena->ptr == ALIGN_DOWN_PTR(arena->ptr, ARENA_ALIGNMENT));
+    arena->end = arena->ptr + size;
+    buf_push(arena->blocks, arena->ptr);
+}
+
+void* arena_alloc(Arena* arena, size_t size)
+{
+    if (size > (size_t)(arena->end - arena->ptr)) {
+        arena_grow(arena, size);
+        assert(size <= (size_t)(arena->end - arena->ptr));
+    }
+    void* ptr = arena->ptr;
+    arena->ptr = ALIGN_UP_PTR(arena->ptr + size, ARENA_ALIGNMENT);
+    assert(arena->ptr <= arena->end);
+    assert(ptr == ALIGN_DOWN_PTR(ptr, ARENA_ALIGNMENT));
+    return ptr;
+}
+
+void arena_free(Arena* arena)
+{
+    for (char** it = arena->blocks; it != buf_end(arena->blocks); it++)
+    {
+        free(*it);
+    }
+    buf_free(arena->blocks);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// String interning
+//
+
+typedef struct Intern {
     size_t len;
     const char* str;
-} intern;
+} Intern;
 
-static intern* interns;
+Arena str_arena;
+Intern* interns;
 
 const char* str_intern_range(const char* start, const char* end)
 {
     size_t len = end - start;
-    for(intern* it = interns; it != buf_end(interns); it++)
+    for(Intern* it = interns; it != buf_end(interns); it++)
     {
         if (it->len == len && strncmp(it->str, start, len) == 0)
         {
             return it->str;
         }
     }
-    char* str = malloc(len + 1);
+    char* str = arena_alloc(&str_arena, len + 1);
     memcpy(str, start, len);
     str[len] = 0;
-    buf_push(interns, ((intern){ len, str }));
+    buf_push(interns, ((Intern){ len, str }));
     return str;
 }
 
@@ -133,21 +203,23 @@ const char* str_intern(const char* str)
     return str_intern_range(str, str + strlen(str));
 }
 
-void str_intern_test()
+void intern_test()
 {
-    char x[] = "hello";
-    char y[] = "hello";
-    assert(x != y);
-    const char* px = str_intern(x);
-    const char* py = str_intern(y);
-    assert(px == py);
-    char z[] = "hello!";
-    const char* pz = str_intern(z);
-    assert(pz != px);
+    char a[] = "hello";
+    assert(strcmp(a, str_intern(a)) == 0);
+    assert(str_intern(a) == str_intern(a));
+    assert(str_intern(str_intern(a)) == str_intern(a));
+    char b[] = "hello";
+    assert(a != b);
+    assert(str_intern(a) == str_intern(b));
+    char c[] = "hello!";
+    assert(str_intern(a) != str_intern(c));
+    char d[] = "hell";
+    assert(str_intern(a) != str_intern(d));
 }
 
 void common_test()
 {
     buf_test();
-    str_intern_test();
+    intern_test();
 }
