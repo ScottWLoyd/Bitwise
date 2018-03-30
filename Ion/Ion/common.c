@@ -1,5 +1,16 @@
 #define MAX(x,y) (x > y ? x : y)
 
+void* xcalloc(size_t num_items, size_t item_size)
+{
+	void* ptr = calloc(num_items, item_size);
+	if (!ptr)
+	{
+		perror("xcalloc failed");
+		exit(1);
+	}
+	return ptr;
+}
+
 void* xrealloc(void* ptr, size_t num_bytes)
 {
     ptr = realloc(ptr, num_bytes);

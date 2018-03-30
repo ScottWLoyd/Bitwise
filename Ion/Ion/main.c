@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "common.c"
 #include "lex.c"
@@ -18,6 +19,7 @@ void run_tests()
 {
     common_test();
     lex_test();
+	ast_test();
 }
 
 int main(int ArgCount, char** Args)
