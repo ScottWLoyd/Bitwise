@@ -6,7 +6,7 @@ int indent;
 
 void print_newline()
 {
-    printf("\n%.*s", 2 * indent);
+    printf("\n%.*s", 2 * indent, "                                                                      ");
 }
 
 void print_typespec(Typespec* type)
@@ -107,19 +107,19 @@ void print_expr(Expr* expr)
             printf(")");
             break;
         case EXPR_UNARY:
-            printf("(%c ", expr->unary.op);
+            printf("(%s ", temp_token_kind_str(expr->unary.op));
             print_expr(expr->unary.expr);
             printf(")");
             break;
         case EXPR_BINARY:
-            printf("(%c ", expr->binary.op);
+            printf("(%s ", temp_token_kind_str(expr->binary.op));
             print_expr(expr->binary.left);
             printf(" ");
             print_expr(expr->binary.right);
             printf(")");
             break;
         case EXPR_TERNARY:
-            printf("(if ");
+            printf("(? ");
             print_expr(expr->ternary.cond);
             printf(" ");
             print_expr(expr->ternary.if_true);
@@ -133,18 +133,13 @@ void print_expr(Expr* expr)
     }
 }
 
-void print_stmt_block(StmtBlock block, bool newlines)
+void print_stmt_block(StmtBlock block)
 {
     assert(block.num_stmts != 0);
     printf("(block");
     indent++;
     for (Stmt** it = block.stmts; it != block.stmts + block.num_stmts; it++) {
-        if (newlines) {
-            print_newline();
-        }
-        else {
-            printf(" ");
-        }
+        print_newline();        
         print_stmt(*it);
     }
     indent--;
@@ -168,26 +163,26 @@ void print_stmt(Stmt* stmt)
             printf("(continue)");
             break;
         case STMT_BLOCK:
-            print_stmt_block(s->block, true);
+            print_stmt_block(s->block);
             break;
         case STMT_IF:
             printf("(if ");
             print_expr(s->if_stmt.cond);
             indent++;
             print_newline();
-            print_stmt_block(s->if_stmt.then_block, true);
+            print_stmt_block(s->if_stmt.then_block);
             for (ElseIf* it = s->if_stmt.elseifs; it != s->if_stmt.elseifs + s->if_stmt.num_elseifs; it++) {
                 print_newline();
                 printf("elseif ");
                 print_expr(it->cond);
                 print_newline();
-                print_stmt_block(it->block, true);
+                print_stmt_block(it->block);
             }
             if (s->if_stmt.else_block.num_stmts != 0) {
                 print_newline();
                 printf("else ");
                 print_newline();
-                print_stmt_block(s->if_stmt.else_block, true);
+                print_stmt_block(s->if_stmt.else_block);
             }
             printf(")");
             indent--;
@@ -197,7 +192,7 @@ void print_stmt(Stmt* stmt)
             print_expr(s->while_stmt.cond);
             indent++;
             print_newline();
-            print_stmt_block(s->while_stmt.block, true);
+            print_stmt_block(s->while_stmt.block);
             indent--;
             printf(")");
             break;
@@ -206,7 +201,7 @@ void print_stmt(Stmt* stmt)
             print_expr(s->while_stmt.cond);
             indent++;
             print_newline();
-            print_stmt_block(s->while_stmt.block, true);
+            print_stmt_block(s->while_stmt.block);
             indent--;
             printf(")");
             break;
@@ -217,8 +212,9 @@ void print_stmt(Stmt* stmt)
             print_stmt(s->for_stmt.next);
             indent++;
             print_newline();
-            print_stmt_block(s->for_stmt.block, true);
+            print_stmt_block(s->for_stmt.block);
             indent--;
+			printf(")");
             break;
         case STMT_SWITCH:
             printf("(switch ");
@@ -243,12 +239,12 @@ void print_stmt(Stmt* stmt)
                 printf(") ");
                 indent++;
                 print_newline();
-                print_stmt_block(it->block, true);
+                print_stmt_block(it->block);
                 indent--;
 
             }
-            printf(")");
             indent--;
+			printf(")");
             break;
         case STMT_ASSIGN:
             printf("(%s ", token_kind_names[s->assign.op]);
@@ -323,14 +319,19 @@ void print_decl(Decl* decl)
             break;
         case DECL_VAR:
             printf("(var %s ", d->name);
-            print_typespec(d->var.type);
+			if (d->var.type) {
+				print_typespec(d->var.type);
+			}
+			else {
+				printf("nil");
+			}
             printf(" ");
             print_expr(d->var.expr);
             printf(")");
             break;
         case DECL_CONST:
             printf("(const %s ", d->name);
-            print_expr(d->var.expr);
+            print_expr(d->const_decl.expr);
             printf(")");
             break;
         case DECL_TYPEDEF:
@@ -342,14 +343,14 @@ void print_decl(Decl* decl)
             printf("(func %s ", d->name);
             printf("(");
             for (FuncParam* it = d->func.params; it != d->func.params + d->func.num_params; it++) {
-                printf(" %s", it->name);
+                printf(" %s ", it->name);
                 print_typespec(it->type);
             }
             printf(" ) ");
             print_typespec(d->func.ret_type);
             indent++;
             print_newline();
-            print_stmt_block(d->func.block, true);
+            print_stmt_block(d->func.block);
             indent--;
             printf(")");
             break;
@@ -366,9 +367,9 @@ void print_test()
         expr_unary('-', expr_float(3.14)),
         expr_ternary(expr_name("flag"), expr_str("true"), expr_str("false")),
         expr_field(expr_name("person"), "name"),
-        expr_call(expr_name("fact"), 1, (Expr*[]) { expr_int(42) }),
+        expr_call(expr_name("fact"), (Expr*[]) { expr_int(42) }, 1),
         expr_index(expr_field(expr_name("person"), "siblings"), expr_int(3)),
-        expr_cast(typespec_pointer(typespec_name("int")), expr_name("void_ptr")),
+        expr_cast(typespec_ptr(typespec_name("int")), expr_name("void_ptr")),
         expr_compound(typespec_name("Vector"), (Expr*[]){expr_int(1), expr_int(2) }, 2),
     };
     for (Expr** it = exprs; it != exprs + sizeof(exprs) / sizeof(exprs[0]); it++)

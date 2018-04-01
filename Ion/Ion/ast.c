@@ -37,7 +37,7 @@ Typespec* typespec_name(const char* name)
 	return type;
 }
 
-Typespec* typespec_pointer(Typespec* elem)
+Typespec* typespec_ptr(Typespec* elem)
 {
 	Typespec* type = typespec_new(TYPESPEC_PTR);
 	type->ptr.elem = elem;
@@ -149,31 +149,31 @@ Expr* expr_new(ExprKind kind) {
 }
 
 Expr* expr_int(uint64_t int_val) {
-	Expr* new_expr = ast_alloc(EXPR_INT);
+	Expr* new_expr = expr_new(EXPR_INT);
 	new_expr->int_val = int_val;
 	return new_expr;
 }
 
 Expr* expr_float(double float_val) {
-	Expr* new_expr = ast_alloc(EXPR_FLOAT);
+	Expr* new_expr = expr_new(EXPR_FLOAT);
 	new_expr->float_val = float_val;
 	return new_expr;
 }
 
 Expr* expr_str(const char* str) {
-	Expr* new_expr = ast_alloc(EXPR_STR);
+	Expr* new_expr = expr_new(EXPR_STR);
 	new_expr->str_val = str;
 	return new_expr;
 }
 
 Expr* expr_name(const char* name) {
-	Expr* new_expr = ast_alloc(EXPR_NAME);
+	Expr* new_expr = expr_new(EXPR_NAME);
 	new_expr->name = name;
 	return new_expr;
 }
 
-Expr* expr_compound(Expr** args, Typespec* type, size_t num_args) {
-    Expr* new_expr = ast_alloc(EXPR_COMPOUND);
+Expr* expr_compound(Typespec* type, Expr** args, size_t num_args) {
+    Expr* new_expr = expr_new(EXPR_COMPOUND);
     new_expr->compound.args = args;
     new_expr->compound.num_args = num_args;
     new_expr->compound.type = type;
@@ -181,21 +181,21 @@ Expr* expr_compound(Expr** args, Typespec* type, size_t num_args) {
 }
 
 Expr* expr_cast(Typespec* type, Expr* expr) {
-	Expr* new_expr = ast_alloc(EXPR_CAST);
+	Expr* new_expr = expr_new(EXPR_CAST);
 	new_expr->cast.type = type;
 	new_expr->cast.expr = expr;
 	return new_expr;
 }
 
 Expr* expr_unary(TokenKind op, Expr* expr) {
-	Expr* new_expr = ast_alloc(EXPR_UNARY);
+	Expr* new_expr = expr_new(EXPR_UNARY);
 	new_expr->unary.op = op;
 	new_expr->unary.expr = expr;
 	return new_expr;
 }
 
 Expr* expr_binary(TokenKind op, Expr* left, Expr* right) {
-	Expr* new_expr = ast_alloc(EXPR_BINARY);
+	Expr* new_expr = expr_new(EXPR_BINARY);
 	new_expr->binary.op = op;
 	new_expr->binary.left = left;
 	new_expr->binary.right = right;
@@ -203,15 +203,15 @@ Expr* expr_binary(TokenKind op, Expr* left, Expr* right) {
 }
 
 Expr* expr_ternary(Expr* cond, Expr* if_true, Expr* if_false) {
-	Expr* new_expr = ast_alloc(EXPR_TERNARY);
+	Expr* new_expr = expr_new(EXPR_TERNARY);
 	new_expr->ternary.cond = cond;
 	new_expr->ternary.if_true = if_true;
 	new_expr->ternary.if_false = if_false;
 	return new_expr;
 }
 
-Expr* expr_call(Expr* expr, size_t num_args, Expr** args) {
-    Expr* new_expr = ast_alloc(EXPR_CALL);
+Expr* expr_call(Expr* expr, Expr** args, size_t num_args) {
+    Expr* new_expr = expr_new(EXPR_CALL);
     new_expr->call.expr = expr;
     new_expr->call.num_args = num_args;
     new_expr->call.args = args;
@@ -219,14 +219,14 @@ Expr* expr_call(Expr* expr, size_t num_args, Expr** args) {
 }
 
 Expr* expr_index(Expr* expr, Expr* index) {
-    Expr* new_expr = ast_alloc(EXPR_INDEX);
+    Expr* new_expr = expr_new(EXPR_INDEX);
     new_expr->index.expr = expr;
     new_expr->index.index = index;
     return new_expr;
 }
 
 Expr* expr_field(Expr* expr, const char* name) {
-    Expr* new_expr = ast_alloc(EXPR_FIELD);
+    Expr* new_expr = expr_new(EXPR_FIELD);
     new_expr->field.expr = expr;
     new_expr->field.name = name;
     return new_expr;

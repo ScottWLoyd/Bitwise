@@ -1,8 +1,74 @@
+const char* typedef_keyword;
+const char* enum_keyword;
+const char* struct_keyword;
+const char* union_keyword;
+const char* var_keyword;
+const char* const_keyword;
+const char* func_keyword;
+const char* sizeof_keyword;
+const char* break_keyword;
+const char* continue_keyword;
+const char* return_keyword;
+const char* if_keyword;
+const char* else_keyword;
+const char* while_keyword;
+const char* do_keyword;
+const char* for_keyword;
+const char* switch_keyword;
+const char* case_keyword;
+const char* default_keyword;
+
+const char* first_keyword;
+const char* last_keyword;
+const char** keywords;
+
+#define KEYWORD(name) name##_keyword = str_intern(#name); buf_push(keywords, name##_keyword)
+
+void init_keywords()
+{
+	static bool inited;
+	if (inited)
+	{
+		return;
+	}
+	char* arena_end = str_arena.end;
+	KEYWORD(typedef);
+	KEYWORD(enum);
+	KEYWORD(struct);
+	KEYWORD(union);
+	KEYWORD(const);
+	KEYWORD(var);
+	KEYWORD(func);
+	KEYWORD(sizeof);
+	KEYWORD(break);
+	KEYWORD(continue);
+	KEYWORD(return);
+	KEYWORD(if);
+	KEYWORD(else);
+	KEYWORD(while);
+	KEYWORD(do);
+	KEYWORD(for);
+	KEYWORD(switch);
+	KEYWORD(case);
+	KEYWORD(default);
+	assert(str_arena.end == arena_end);
+	first_keyword = typedef_keyword;
+	last_keyword = default_keyword;
+	inited = true;
+}
+
+#undef KEYWORD
+
+bool is_keyword_str(const char* str)
+{
+	return first_keyword <= str && str <= last_keyword;
+}
 
 typedef enum TokenKind
 {
     TOKEN_EOF = 0,
     TOKEN_LAST_CHAR = 127,
+	TOKEN_KEYWORD,
     TOKEN_INT,
     TOKEN_FLOAT,
     TOKEN_STR,
@@ -19,6 +85,7 @@ typedef enum TokenKind
     TOKEN_DEC,
     TOKEN_COLON_ASSIGN,
     TOKEN_ADD_ASSIGN,
+	TOKEN_FIRST_ASSIGN = TOKEN_ADD_ASSIGN,
     TOKEN_SUB_ASSIGN,
     TOKEN_OR_ASSIGN,
     TOKEN_AND_ASSIGN,
@@ -28,6 +95,7 @@ typedef enum TokenKind
     TOKEN_MUL_ASSIGN,
     TOKEN_DIV_ASSIGN,
     TOKEN_MOD_ASSIGN,
+	TOKEN_LAST_ASSIGN = TOKEN_MOD_ASSIGN,
 } TokenKind;
 
 typedef enum TokenMod
@@ -38,6 +106,74 @@ typedef enum TokenMod
     TOKENMOD_OCT,
     TOKENMOD_CHAR,
 } TokenMod;
+
+const char* token_kind_names[] = {
+	[TOKEN_EOF] = "EOF",
+	[TOKEN_INT] = "int",
+	[TOKEN_FLOAT] = "float",
+	[TOKEN_STR] = "string",
+	[TOKEN_NAME] = "name",
+	[TOKEN_LSHIFT] = "<<",
+	[TOKEN_RSHIFT] = ">>",
+	[TOKEN_EQ] = "==",
+	[TOKEN_NOTEQ] = "!=",
+	[TOKEN_LTEQ] = "<=",
+	[TOKEN_GTEQ] = ">=",
+	[TOKEN_AND] = "&&",
+	[TOKEN_OR] = "||",
+	[TOKEN_INC] = "++",
+	[TOKEN_DEC] = "--",
+	[TOKEN_COLON_ASSIGN] = ":=",
+	[TOKEN_ADD_ASSIGN] = "+=",
+	[TOKEN_SUB_ASSIGN] = "-=",
+	[TOKEN_OR_ASSIGN] = "|=",
+	[TOKEN_AND_ASSIGN] = "&=",
+	[TOKEN_XOR_ASSIGN] = "^=",
+	[TOKEN_LSHIFT_ASSIGN] = "<<=",
+	[TOKEN_RSHIFT_ASSIGN] = ">>=",
+	[TOKEN_MUL_ASSIGN] = "*=",
+	[TOKEN_DIV_ASSIGN] = "/=",
+	[TOKEN_MOD_ASSIGN] = "%=",
+};
+
+const char* token_kind_name(TokenKind kind)
+{
+	if (kind < sizeof(token_kind_names) / sizeof(*token_kind_names))
+	{
+		return token_kind_names[kind];
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+size_t copy_token_kind_str(char* dest, size_t dest_size, TokenKind kind)
+{
+	size_t n = 0;
+	const char* name = token_kind_name(kind);
+	if (name)
+	{
+		n = snprintf(dest, dest_size, "%s", name);
+	}
+	else if (kind < 128 && isprint(kind))
+	{
+		n = snprintf(dest, dest_size, "%c", kind);
+	}
+	else
+	{
+		n = snprintf(dest, dest_size, "<ASCII %d>", kind);
+	}
+	return n;
+}
+
+const char* temp_token_kind_str(TokenKind kind)
+{
+	static char buf[256];
+	size_t n = copy_token_kind_str(buf, sizeof(buf), kind);
+	assert(n + 1 <= sizeof(buf));
+	return buf;
+}
 
 typedef struct Token
 {
@@ -52,48 +188,6 @@ typedef struct Token
         const char* name;
     };
 } Token;
-
-size_t copy_token_kind_str(char* dest, size_t dest_size, TokenKind kind)
-{
-    size_t n = 0;
-    switch (kind)
-    {
-        case 0: {
-            n = snprintf(dest, dest_size, "end of file");
-        } break;
-        case TOKEN_INT: {
-            n = snprintf(dest, dest_size, "integer");
-        } break;
-        case TOKEN_FLOAT: {
-            n = snprintf(dest, dest_size, "float");
-        } break;
-        case TOKEN_NAME: {
-            n = snprintf(dest, dest_size, "name");
-        } break;
-        case TOKEN_STR: {
-            n = snprintf(dest, dest_size, "string");
-        } break;
-        default: {
-            if (kind < 128 && isprint(kind))
-            {
-                n = snprintf(dest, dest_size, "%c", (char)kind);
-            }
-            else
-            {
-                n = snprintf(dest, dest_size, "<ASCII %d>", kind);
-            }
-        } break;
-    }
-    return n;
-}
-
-const char* token_kind_str(TokenKind kind)
-{
-    static char buf[256];
-    size_t n = copy_token_kind_str(buf, sizeof(buf), kind);
-    assert(n + 1 <= sizeof(buf));
-    return buf;
-}
 
 Token token;
 const char* stream;
@@ -331,19 +425,19 @@ void scan_str()
 
 void next_token()
 {
-    while (isspace(*stream))
-    {
-        stream++;
-    }
-
+repeat:
     token.start = stream;
     token.mod = 0;
     switch (*stream)
     {
-#if 0
         case ' ': case '\n': case '\r': case '\t': case '\v': {
+			while (isspace(*stream))
+			{
+				stream++;
+			}
+			goto repeat;
         } break;
-#endif
+
         case '\'': {
             scan_char();
         } break;
@@ -377,11 +471,10 @@ void next_token()
         case 'K': case 'L': case 'M': case 'N': case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T':
         case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
         case '_': {
-            const char* start = stream;
             while (isalnum(*stream) || *stream == '_')
                 stream++;
-            token.kind = TOKEN_NAME;
             token.name = str_intern_range(token.start, stream);
+			token.kind = is_keyword_str(token.name) ? TOKEN_KEYWORD : TOKEN_NAME;
         } break;
         case '<': {
             token.kind = *stream++;
@@ -414,19 +507,20 @@ void next_token()
             }
         } break;
 
-            CASE1('^', '=', TOKEN_XOR_ASSIGN)
-                CASE1(':', '=', TOKEN_COLON_ASSIGN)
-                CASE1('*', '=', TOKEN_MUL_ASSIGN)
-                CASE1('/', '=', TOKEN_DIV_ASSIGN)
-                CASE1('%', '=', TOKEN_MOD_ASSIGN)
-                CASE2('+', '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
-                CASE2('-', '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
-                CASE2('&', '=', TOKEN_AND_ASSIGN, '&', TOKEN_AND)
-                CASE2('|', '=', TOKEN_OR_ASSIGN, '|', TOKEN_OR)
+		CASE1('=', '=', TOKEN_EQ);
+        CASE1('^', '=', TOKEN_XOR_ASSIGN)
+        CASE1(':', '=', TOKEN_COLON_ASSIGN)
+        CASE1('*', '=', TOKEN_MUL_ASSIGN)
+        CASE1('/', '=', TOKEN_DIV_ASSIGN)
+        CASE1('%', '=', TOKEN_MOD_ASSIGN)
+        CASE2('+', '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
+        CASE2('-', '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
+        CASE2('&', '=', TOKEN_AND_ASSIGN, '&', TOKEN_AND)
+        CASE2('|', '=', TOKEN_OR_ASSIGN, '|', TOKEN_OR)
 
         default: {
-                token.kind = *stream++;
-            } break;
+            token.kind = *stream++;
+        } break;
     }
     token.end = stream;
 }
@@ -440,36 +534,37 @@ void init_stream(const char* str)
     next_token();
 }
 
-void print_token(Token token)
-{
-    switch (token.kind)
-    {
-        case TOKEN_INT:
-            printf("TOKEN INT: %llu\n", token.int_val);
-            break;
-        case TOKEN_FLOAT:
-            printf("TOKEN FLOAT: %f\n", token.float_val);
-            break;
-        case TOKEN_STR:
-            printf("TOKEN STRING: %s\n", token.str_val);
-            break;
-        case TOKEN_NAME:
-            printf("TOKEN NAME: %.*s\n", token.end - token.start, token.start);
-            break;
-        default:
-            printf("TOKEN: '%c'\n", token.kind);
-            break;
-    }
-}
-
 inline bool is_token(TokenKind kind)
 {
     return token.kind == kind;
 }
 
+inline bool is_token_eof()
+{
+	return token.kind == TOKEN_EOF;
+}
+
 inline bool is_token_name(const char* name)
 {
     return token.kind == TOKEN_NAME && token.name == name;
+}
+
+inline bool is_keyword(const char* name)
+{
+	return is_token(TOKEN_KEYWORD) && token.name == name;
+}
+
+inline bool match_keyword(const char* name)
+{
+	if (is_keyword(name))
+	{
+		next_token();
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 inline bool match_token(TokenKind kind)
@@ -496,9 +591,21 @@ inline bool expect_token(TokenKind kind)
     {
         char buf[256];
         copy_token_kind_str(buf, sizeof(buf), kind);
-        fatal("expected token: %s, got %s\n", buf, token_kind_str(token.kind));
+        fatal("expected token: %s, got %s\n", buf, token_kind_name(token.kind));
         return false;
     }
+}
+
+void keyword_test()
+{
+	init_keywords();
+	assert(is_keyword_str(first_keyword));
+	assert(is_keyword_str(last_keyword));
+	for (const char** it = keywords; it != buf_end(keywords); it++)
+	{
+		assert(is_keyword_str(*it));
+	}
+	assert(!is_keyword_str(str_intern("foo")));
 }
 
 #define assert_token(x) assert(match_token(x))
@@ -510,6 +617,8 @@ inline bool expect_token(TokenKind kind)
 
 void lex_test()
 {
+	keyword_test();
+
     // Integer literal tests
     init_stream("0 18446744073709551615 0xffffffffffffffff 042 0b0101");
     assert_token_int(0);
@@ -572,6 +681,8 @@ void lex_test()
 }
 
 #undef assert_token_eof
+#undef assert_token_str
+#undef assert_token_float
 #undef assert_token_int
 #undef assert_token_name
 #undef assert_token

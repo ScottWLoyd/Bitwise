@@ -93,6 +93,7 @@ typedef struct buf_hdr
 #define buf_len(b)  ((b) ? buf__hdr(b)->len : 0)
 #define buf_cap(b)  ((b) ? buf__hdr(b)->cap : 0)
 #define buf_end(b)  ((b) + buf_len(b))
+#define buf_sizeof(b) ((b) ? buf_len(b)*sizeof(*b) : 0)
 #define buf_push(b, ...) (buf__fit((b), 1), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
 #define buf_free(b) ((b) ? free(buf__hdr(b)), (b) = NULL : 0)
 
