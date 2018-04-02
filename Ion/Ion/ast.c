@@ -172,6 +172,20 @@ Expr* expr_name(const char* name) {
 	return new_expr;
 }
 
+Expr* expr_sizeof_type(Typespec* type)
+{
+	Expr* new_expr = expr_new(EXPR_SIZEOF_TYPE);
+	new_expr->sizeof_type = type;
+	return new_expr;
+}
+
+Expr* expr_sizeof_expr(Expr* expr)
+{
+	Expr* new_expr = expr_new(EXPR_SIZEOF_EXPR);
+	new_expr->sizeof_expr = expr;
+	return new_expr;
+}
+
 Expr* expr_compound(Typespec* type, Expr** args, size_t num_args) {
     Expr* new_expr = expr_new(EXPR_COMPOUND);
     new_expr->compound.args = args;

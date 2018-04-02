@@ -63,6 +63,16 @@ void print_expr(Expr* expr)
         case EXPR_NAME:
             printf("%s", expr->name);
             break;
+		case EXPR_SIZEOF_EXPR:
+			printf("(sizeof-expr ");
+			print_expr(expr->sizeof_expr);
+			printf(")");
+			break;
+		case EXPR_SIZEOF_TYPE:
+			printf("(sizeof-type ");
+			print_typespec(expr->sizeof_type);
+			printf(")");
+			break;
         case EXPR_CAST:
             printf("(cast ");
             print_typespec(expr->cast.type);
@@ -249,8 +259,11 @@ void print_stmt(Stmt* stmt)
         case STMT_ASSIGN:
             printf("(%s ", token_kind_names[s->assign.op]);
             print_expr(s->assign.left);
-            printf(" ");
-            print_expr(s->assign.right);
+			if (s->assign.right)
+			{
+				printf(" ");
+				print_expr(s->assign.right);
+			}
             printf(")");
             break;
         case STMT_INIT:
@@ -292,8 +305,8 @@ void print_decl(Decl* decl)
             for (EnumItem* it = d->enum_decl.items; it != d->enum_decl.items + d->enum_decl.num_items; it++) {
                 print_newline();
                 printf("(%s ", it->name);
-                if (it->expr) {
-                    print_expr(it->expr);
+                if (it->init) {
+                    print_expr(it->init);
                 }
                 else {
                     printf("nil");
@@ -347,7 +360,12 @@ void print_decl(Decl* decl)
                 print_typespec(it->type);
             }
             printf(" ) ");
-            print_typespec(d->func.ret_type);
+			if (d->func.ret_type) {
+				print_typespec(d->func.ret_type);
+			}
+			else {
+				printf("nil");
+			}
             indent++;
             print_newline();
             print_stmt_block(d->func.block);
