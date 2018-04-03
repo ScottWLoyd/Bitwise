@@ -17,13 +17,15 @@
 #include "ast.c"
 #include "print.c"
 #include "parse.c"
+#include "resolve.c"
 
 void run_tests()
 {
     common_test();
     lex_test();
-    // print_test();
+    print_test();
 	parse_test();
+	resolve_test();
 }
 
 int main(int ArgCount, char** Args)

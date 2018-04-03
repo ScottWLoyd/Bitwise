@@ -53,6 +53,7 @@ void fatal(const char* fmt, ...)
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
+    __debugbreak();
     exit(1);
 }
 
@@ -74,37 +75,39 @@ void fatal_syntax_error(const char* fmt, ...)
     vprintf(fmt, args);
     printf("\n");
     va_end(args);
+    __debugbreak();
     exit(1);
 }
 
 // Stretchy buffers
-typedef struct buf_hdr
+typedef struct BufHdr
 {
     size_t len;
     size_t cap;
     char buf[0];
-} buf_hdr;
+} BufHdr;
 
-#define BUF(x) x*
-#define buf__hdr(b) ((buf_hdr*)((char*)(b) - offsetof(buf_hdr, buf)))
-#define buf__fits(b, n) (buf_len(b) + (n) <= buf_cap(b))
-#define buf__fit(b, n) (buf__fits((b), (n)) ? 0 : ((b) = buf__grow((b), buf_len(b) + (n), sizeof(*(b)))))
+#define buf__hdr(b) ((BufHdr*)((char*)(b) - offsetof(BufHdr, buf)))
 
 #define buf_len(b)  ((b) ? buf__hdr(b)->len : 0)
 #define buf_cap(b)  ((b) ? buf__hdr(b)->cap : 0)
 #define buf_end(b)  ((b) + buf_len(b))
 #define buf_sizeof(b) ((b) ? buf_len(b)*sizeof(*b) : 0)
-#define buf_push(b, ...) (buf__fit((b), 1), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
+
 #define buf_free(b) ((b) ? free(buf__hdr(b)), (b) = NULL : 0)
+#define buf_fit(b, n) ((n) <= buf_cap(b) ? 0 : ((b) = buf__grow((b), (n), sizeof(*(b)))))
+#define buf_push(b, ...) (buf_fit((b), 1 + buf_len(b)), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
+#define buf_printf(b, ...) ((b) = buf__printf((b), __VA_ARGS__))
+#define buf_clear(b) ((b) ? buf__hdr(b)->len = 0 : 0)
 
 void* buf__grow(const void* buf, size_t new_len, size_t elem_size)
 {
     assert(buf_cap(buf) <= (SIZE_MAX - 1) / 2);
     size_t new_cap = MAX(1 + 2 * buf_cap(buf), new_len);
     assert(new_len <= new_cap);
-    assert(new_cap <= (SIZE_MAX - offsetof(buf_hdr, buf)) / elem_size);
-    size_t new_size = offsetof(buf_hdr, buf) + new_cap * elem_size;
-    buf_hdr* new_hdr;
+    assert(new_cap <= (SIZE_MAX - offsetof(BufHdr, buf)) / elem_size);
+    size_t new_size = offsetof(BufHdr, buf) + new_cap * elem_size;
+    BufHdr* new_hdr;
     if (buf) {
         new_hdr = xrealloc(buf__hdr(buf), new_size);
     }
@@ -116,6 +119,25 @@ void* buf__grow(const void* buf, size_t new_len, size_t elem_size)
     return new_hdr->buf;
 }
 
+char* buf__printf(char* buf, const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	size_t n = vsnprintf(NULL, 0, fmt, args);
+	va_end(args);
+	if (buf_len(buf) == 0)
+	{
+		n++;
+	}
+	buf_fit(buf, n + buf_len(buf));
+	char* dest = buf_len(buf) == 0 ? buf : buf + buf_len(buf) - 1;
+	va_start(args, fmt);
+	vsnprintf(dest, buf + buf_cap(buf) - dest, fmt, args);
+	va_end(args);
+	buf__hdr(buf)->len += n;
+	return buf;
+}
+
 void buf_test()
 {
     int* asdf = NULL;
@@ -124,6 +146,11 @@ void buf_test()
         buf_push(asdf, i);
     assert(buf_len(asdf) == N);
     buf_free(asdf);
+	char* str = NULL;
+	buf_printf(str, "One: %d\n", 1);
+	assert(strcmp(str, "One: 1\n") == 0);
+	buf_printf(str, "Hex: 0x%x\n", 0x12345678);
+	assert(strcmp(str, "One: 1\nHex: 0x12345678\n") == 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

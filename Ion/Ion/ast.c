@@ -257,6 +257,13 @@ Stmt* stmt_new(StmtKind kind)
     return s;
 }
 
+Stmt* stmt_decl(Decl* decl)
+{
+	Stmt* s = stmt_new(STMT_DECL);
+	s->decl = decl;
+	return s;
+}
+
 Stmt* stmt_return(Expr* expr)
 {
     Stmt* s = stmt_new(STMT_RETURN);

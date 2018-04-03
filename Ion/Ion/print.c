@@ -4,6 +4,23 @@ void print_decl(Decl* decl);
 
 int indent;
 
+char* print_buf;
+bool use_print_buf;
+
+#define printf(...) (use_print_buf ? (void)buf_printf(print_buf, __VA_ARGS__) : (void)printf(__VA_ARGS__))
+
+void flush_print_buf(FILE* file)
+{
+	if (print_buf)
+	{
+		if (file)
+		{
+			fputs(print_buf, file);
+		}
+		buf_clear(print_buf);
+	}
+}
+
 void print_newline()
 {
     printf("\n%.*s", 2 * indent, "                                                                      ");
@@ -24,7 +41,7 @@ void print_typespec(Typespec* type)
                 printf(" ");
                 print_typespec(*it);
             }
-            printf(") ");
+            printf(" ) ");
             print_typespec(t->func.ret);
             printf(")");
             break;
@@ -117,12 +134,12 @@ void print_expr(Expr* expr)
             printf(")");
             break;
         case EXPR_UNARY:
-            printf("(%s ", temp_token_kind_str(expr->unary.op));
+            printf("(%s ", token_kind_name(expr->unary.op));
             print_expr(expr->unary.expr);
             printf(")");
             break;
         case EXPR_BINARY:
-            printf("(%s ", temp_token_kind_str(expr->binary.op));
+            printf("(%s ", token_kind_name(expr->binary.op));
             print_expr(expr->binary.left);
             printf(" ");
             print_expr(expr->binary.right);
@@ -162,8 +179,12 @@ void print_stmt(Stmt* stmt)
     switch (s->kind)
     {
         case STMT_RETURN:
-            printf("(return ");
-            print_expr(s->return_stmt.expr);
+            printf("(return");
+			if (s->return_stmt.expr)
+			{
+				printf(" ");
+				print_expr(s->return_stmt.expr);
+			}
             printf(")");
             break;
         case STMT_BREAK:
@@ -380,9 +401,10 @@ void print_decl(Decl* decl)
 
 void print_test()
 {
+	use_print_buf = true;
     Expr* exprs[] = {
-        expr_binary('+', expr_int(1), expr_int(2)),
-        expr_unary('-', expr_float(3.14)),
+        expr_binary(TOKEN_ADD, expr_int(1), expr_int(2)),
+        expr_unary(TOKEN_SUB, expr_float(3.14)),
         expr_ternary(expr_name("flag"), expr_str("true"), expr_str("false")),
         expr_field(expr_name("person"), "name"),
         expr_call(expr_name("fact"), (Expr*[]) { expr_int(42) }, 1),
@@ -395,23 +417,96 @@ void print_test()
         print_expr(*it);
         printf("\n");
     }
+	flush_print_buf(stdout);
+	use_print_buf = false;
 
-    Stmt* stmts[] = {
-        stmt_return(expr_int(42)),
-        stmt_break(),
-        stmt_continue(),
-        stmt_block(
-            (StmtBlock) {
-                (Stmt*[]) {
-                    stmt_break(),
-                    stmt_continue()
-                },
-                2,
-            }
-        ),
-        stmt_expr(expr_call(expr_name("print"), (Expr*[]) { expr_int(1), expr_int(2) }, 2)),
-
-    };
+	// Statements
+	Stmt *stmts[] = {
+		stmt_return(expr_int(42)),
+		stmt_break(),
+		stmt_continue(),
+		stmt_block(
+			(StmtBlock) {
+		(Stmt*[]) {
+		stmt_break(),
+			stmt_continue()
+	},
+			2,
+	}
+	),
+		stmt_expr(expr_call(expr_name("print"), (Expr*[]) { expr_int(1), expr_int(2) }, 2)),
+		stmt_init("x", expr_int(42)),
+		stmt_if(
+			expr_name("flag1"),
+			(StmtBlock) {
+		(Stmt*[]) {
+		stmt_return(expr_int(1))
+	},
+			1,
+	},
+			(ElseIf[]) {
+		expr_name("flag2"),
+			(StmtBlock) {
+			(Stmt*[]) {
+			stmt_return(expr_int(2))
+		},
+				1,
+		}
+	},
+			1,
+		(StmtBlock) {
+		(Stmt*[]) {
+		stmt_return(expr_int(3))
+	},
+			1,
+	}
+	),
+		stmt_while(
+			expr_name("running"),
+			(StmtBlock) {
+		(Stmt*[]) {
+		stmt_assign(TOKEN_ADD_ASSIGN, expr_name("i"), expr_int(16)),
+	},
+			1,
+	}
+	),
+		stmt_switch(
+			expr_name("val"),
+			(SwitchCase[]) {
+				{
+					(Expr*[]) {
+					expr_int(3), expr_int(4)
+				},
+						2,
+						false,
+						(StmtBlock) {
+						(Stmt*[]) {
+						stmt_return(expr_name("val"))
+					},
+							1,
+					},
+				},
+				{
+					(Expr*[]){expr_int(1)},
+					1,
+							true,
+							(StmtBlock) {
+							(Stmt*[]) {
+							stmt_return(expr_int(0))
+						},
+								1,
+						},
+				},
+	},
+			2
+								),
+	};
+	for (Stmt **it = stmts; it != stmts + sizeof(stmts) / sizeof(*stmts); it++) {
+		print_stmt(*it);
+		printf("\n");
+	}
+	flush_print_buf(stdout);
+	use_print_buf = false;
 }
 
 

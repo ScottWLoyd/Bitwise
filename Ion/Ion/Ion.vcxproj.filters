@@ -33,6 +33,9 @@
     <ClCompile Include="parse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="resolve.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="syntax.txt" />
