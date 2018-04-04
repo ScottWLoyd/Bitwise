@@ -31,5 +31,6 @@ void run_tests()
 int main(int ArgCount, char** Args)
 {
     run_tests();
+    getchar();
     return 0;
 }

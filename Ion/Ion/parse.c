@@ -366,7 +366,7 @@ Stmt* parse_stmt_do_while()
 		return NULL;
 	}
 	Expr* cond = parse_paren_expr();
-	Stmt* stmt = stmt_do_while(parse_paren_expr(), block);
+	Stmt* stmt = stmt_do_while(cond, block);
 	expect_token(TOKEN_SEMICOLON);
 	return stmt;
 }
@@ -703,7 +703,6 @@ Decl* parse_decl_opt()
 	}
 	else
 	{
-		fatal_syntax_error("Expected declaration keyword, got %s", token_info());
 		return NULL;
 	}
 }
@@ -721,11 +720,12 @@ Decl* parse_decl()
 void parse_test()
 {
     const char* decls[] = {
-        "func fact(n: int): int { trace(\"fact\"); if (n == 0) { return 1; } else { return n * fact(n-1); } }",
+        "func f() { do { print(42); } while(1); }",
         "const y = sizeof(:int*[3])",
         "const y = sizeof(1+3)",
         "var x = b == 1 ? 1+2 : 3-4",
         "func fact(n: int): int { p := 1; for (i := 1; i <= n; i++) { p *= i; } return p; }",
+        "func fact(n: int): int { trace(\"fact\"); if (n == 0) { return 1; } else { return n * fact(n-1); } }",
         "var foo = a ? a&b + c<<d + e*f == +u-v-w + *g/h(x,y) + -i%k[x] && m <= n*(p+q)/r : 0",
         "func f(x: int): bool { switch(x) { case 0: case 1: return true; case 2: default: return false; } }",
         "enum Color { RED=3, GREEN, BLUE=0 }",
@@ -735,7 +735,6 @@ void parse_test()
         "var v: Vector = {1.0, -1.0}",
         "union IntOrFloat { i: int; f: float; }",
         "typedef Vectors = Vector[1+2]",
-        "func f() { do { print(42); } while(1); }",
         "typedef T = (func(int):int)[16]",
         "func f() { enum E { A, B, C } return; }",
         "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
