@@ -169,23 +169,31 @@ typedef struct Entity {
 } Entity;
 
 typedef enum SymState {
-    SYM_UNRESOLVED,
-    SYM_RESOLVING,
-    SYM_RESOLVED,
+    SYM_UNORDERED,
+    SYM_ORDERING,
+    SYM_ORDERED,
 } SymState;
 
+typedef enum SymKind {
+    SYM_BUILTIN,
+    SYM_DECL,
+    SYM_ENUM_CONST,
+} SymKind;
+
 typedef struct Sym {
+    SymKind kind;
     const char* name;
-    Decl* decl;
     SymState state;
-    Entity* ent;
+    union {
+        Decl* decl;
+    };
 } Sym;
 
-Sym* syms;
+Sym* global_syms;
 
 Sym* sym_get(const char* name)
 {
-    for (Sym* it = syms; it != buf_end(syms); it++)
+    for (Sym* it = global_syms; it != buf_end(global_syms); it++)
     {
         if (it->name == name)
         {
@@ -195,13 +203,223 @@ Sym* sym_get(const char* name)
     return NULL;
 }
 
-void sym_put(Decl* decl)
+void sym_builtin(const char* name)
 {
-    assert(decl->name);
-    assert(!sym_get(decl->name));
-    buf_push(syms, (Sym) { decl->name, decl, SYM_UNRESOLVED });
+    if (sym_get(name))
+    {
+        fatal("Duplicate name");
+    }
+    buf_push(global_syms, (Sym) { 
+        .kind = SYM_BUILTIN, 
+        .name = name, 
+        .state = SYM_ORDERED 
+    });
 }
 
+void sym_enum_const(const char* name, Decl* decl)
+{
+    if (sym_get(decl->name))
+    {
+        fatal("Duplicate name");
+    }
+    buf_push(global_syms, (Sym) {
+        .kind = SYM_ENUM_CONST,
+        .name = name,
+        .state = SYM_UNORDERED,
+        .decl = decl,
+    });
+}
+
+void sym_decl(Decl* decl)
+{
+    if (sym_get(decl->name))
+    {
+        fatal("Duplicate name");
+    }
+    buf_push(global_syms, (Sym) {
+        .kind = SYM_DECL,
+        .name = decl->name,
+        .state = SYM_UNORDERED,
+        .decl = decl,
+    });
+    if (decl->kind == DECL_ENUM)
+    {
+        for (size_t i = 0; i < decl->enum_decl.num_items; i++)
+        {
+            sym_enum_const(decl->enum_decl.items[i].name, decl);
+        }
+    }
+}
+
+Decl** ordered_decls = NULL;
+
+void order_decl(Decl* decl);
+void order_typespec(Typespec* typespec);
+
+void order_name(const char* name)
+{
+    Sym* sym = sym_get(name);
+    if (!sym)
+    {
+        fatal("Non-existent name '%s'", name);
+        return;
+    }
+    if (sym->state == SYM_ORDERED)
+    {
+        return;
+    }
+    if (sym->state == SYM_ORDERING)
+    {
+        fatal("Cyclic dependency");
+        return;
+    }
+    sym->state = SYM_ORDERING;
+    order_decl(sym->decl);
+    sym->state = SYM_ORDERED;
+    if (sym->kind == SYM_DECL)
+    {
+        buf_push(ordered_decls, sym->decl);
+    }
+}
+
+void order_expr(Expr* expr)
+{
+    switch (expr->kind)
+    {
+        case EXPR_INT:
+        case EXPR_FLOAT:
+        case EXPR_STR:
+            break;
+        case EXPR_NAME:
+            order_name(expr->name);
+            break;
+        case EXPR_CAST:
+            order_typespec(expr->cast.type);
+            order_expr(expr->cast.expr);
+            break;
+        case EXPR_CALL:
+            order_expr(expr->call.expr);
+            for (size_t i = 0; i < expr->call.num_args; i++)
+            {
+                order_expr(expr->call.args[i]);
+            }
+            break;
+        case EXPR_INDEX:
+            order_expr(expr->index.expr);
+            order_expr(expr->index.index);
+            break;
+        case EXPR_FIELD:
+            order_expr(expr->field.expr);
+            break;
+        case EXPR_COMPOUND:
+            if (expr->compound.type)
+                order_typespec(expr->compound.type);
+            for (size_t i = 0; i < expr->compound.num_args; i++)
+            {
+                order_expr(expr->compound.args[i]);
+            }
+            break;
+        case EXPR_UNARY:
+            order_expr(expr->unary.expr);
+            break;
+        case EXPR_BINARY:
+            order_expr(expr->binary.left);
+            order_expr(expr->binary.right);
+            break;
+        case EXPR_TERNARY:
+            order_expr(expr->ternary.cond);
+            order_expr(expr->ternary.if_true);
+            order_expr(expr->ternary.if_false);
+            break;
+        case EXPR_SIZEOF_EXPR:
+            order_expr(expr->sizeof_expr);
+            break;
+        case EXPR_SIZEOF_TYPE:
+            order_typespec(expr->sizeof_type);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
+
+
+void order_typespec(Typespec* typespec)
+{
+    switch (typespec->kind)
+    {
+        case TYPESPEC_NAME:
+            order_name(typespec->name);
+            break;
+        case TYPESPEC_FUNC:
+            for (size_t i = 0; i < typespec->func.num_args; i++)
+            {
+                order_typespec(typespec->func.args[i]);
+            }
+            order_typespec(typespec->func.ret);
+            break;
+        case TYPESPEC_ARRAY:
+            order_typespec(typespec->array.elem);
+            order_expr(typespec->array.size);
+            break;
+        case TYPESPEC_PTR:
+            // TODO: Think about forward declaration, etc
+            //order_typespec(typespec->ptr.elem);
+            break;
+        default:
+            assert(0);
+            break;
+    }
+}
+
+void order_decl(Decl* decl)
+{
+    switch (decl->kind)
+    {
+        case DECL_STRUCT:
+        case DECL_UNION:
+            for (size_t i = 0; i < decl->aggregate.num_items; i++)
+            {
+                order_typespec(decl->aggregate.items[i].type);
+            }
+            break;
+        case DECL_ENUM:
+            for (size_t i = 0; i < decl->enum_decl.num_items; i++)
+            {
+                Expr* init = decl->enum_decl.items[i].init;
+                if (init)
+                {
+                    order_expr(init);
+                }
+            }
+            break;
+        case DECL_VAR:
+            order_typespec(decl->var.type);
+            order_expr(decl->var.expr);
+            break;
+        case DECL_CONST:
+            order_expr(decl->const_decl.expr);
+            break;
+        case DECL_TYPEDEF:
+            order_typespec(decl->typedef_decl.type);
+            break;
+        case DECL_FUNC:
+            break;
+        default: 
+            assert(0);
+            break;
+    }
+}
+
+void order_decls(void)
+{
+    for (size_t i = 0; i < buf_len(global_syms); i++)
+    {
+        order_name(global_syms[i].name);
+    }
+}
+
+#if 0
 void resolve_decl(Decl* decl)
 {
     switch (decl->kind)
@@ -213,12 +431,12 @@ void resolve_decl(Decl* decl)
 
 void resolve_sym(Sym* sym)
 {
-    if (sym->state == SYM_RESOLVED)
+    if (sym->state == SYM_ORDERED)
     {
         return;
     }
 
-    if (sym->state == SYM_RESOLVING)
+    if (sym->state == SYM_ORDERING)
     {
         fatal("Cyclic dependency");
         return;
@@ -238,20 +456,21 @@ Sym* resolve_name(const char* name)
     return sym;
 }
 
-void resolve_syms()
+void resolve_syms(void)
 {
-    for (Sym* it = syms; it != buf_end(syms); it++)
+    for (Sym* it = global_syms; it != buf_end(global_syms); it++)
     {
         resolve_sym(it);
     }
 }
+#endif
 
-void resolve_test()
+void resolve_test(void)
 {
     const char* foo = str_intern("foo");
     assert(sym_get(foo) == NULL);
     Decl* decl = decl_const(foo, expr_int(42));
-    sym_put(decl);
+    sym_decl(decl);
     Sym* sym = sym_get(foo);
     assert(sym && sym->decl == decl);
 
@@ -272,4 +491,33 @@ void resolve_test()
     Type* int_func = type_func(NULL, 0, type_int);
     assert(int_int_func != int_func);
     assert(int_func == type_func(NULL, 0, type_int));
+}
+
+void order_test(void)
+{
+    const char* code_decl[] = {
+        //"const a = 1",
+        //"const b = a",
+        //"struct S { t: T; }",
+        //"struct T { i: int[n]; }",
+        //"const n = 1024",
+        "enum E { A, B, C }"
+        "struct S { t: T*; }",
+        "struct T { s: S*; }",
+    };
+    sym_builtin(str_intern("int"));
+    sym_builtin(str_intern("float"));
+    for (size_t i = 0; i < sizeof(code_decl) / sizeof(code_decl[0]); i++)
+    {
+        init_stream(code_decl[i]);
+        Decl* decl = parse_decl();
+        sym_decl(decl);
+    }
+   
+    order_decls();
+    for (size_t i = 0; i < buf_len(ordered_decls); i++)
+    {
+        
+        printf("%s\n", ordered_decls[i]->name);
+    }
 }

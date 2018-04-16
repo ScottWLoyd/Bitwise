@@ -24,7 +24,7 @@ const char** keywords;
 
 #define KEYWORD(name) name##_keyword = str_intern(#name); buf_push(keywords, name##_keyword)
 
-void init_keywords()
+void init_keywords(void)
 {
 	static bool inited;
 	if (inited)
@@ -219,7 +219,7 @@ typedef struct Token
 Token token;
 const char* stream;
 
-const char* token_info()
+const char* token_info(void)
 {
 	if (token.kind == TOKEN_NAME || token.kind == TOKEN_KEYWORD)
 	{
@@ -250,7 +250,7 @@ uint8_t char_to_digit[256] = {
     ['f'] = 15,['F'] = 15,
 };
 
-void scan_int()
+void scan_int(void)
 {
     uint64_t base = 10;
     if (*stream == '0')
@@ -303,7 +303,7 @@ void scan_int()
     token.int_val = val;
 }
 
-void scan_float()
+void scan_float(void)
 {
     const char* start = stream;
     while (isdigit(*stream))
@@ -357,7 +357,7 @@ char escape_to_char[256] =
 
 
 
-void scan_char()
+void scan_char(void)
 {
     assert(*stream == '\'');
     stream++;
@@ -401,7 +401,7 @@ void scan_char()
     token.mod = TOKENMOD_CHAR;
 }
 
-void scan_str()
+void scan_str(void)
 {
     assert(*stream == '"');
     stream++;
@@ -471,7 +471,7 @@ void scan_str()
 
 		
 
-void next_token()
+void next_token(void)
 {
 repeat:
     token.start = stream;
@@ -611,7 +611,7 @@ inline bool is_token(TokenKind kind)
     return token.kind == kind;
 }
 
-inline bool is_token_eof()
+inline bool is_token_eof(void)
 {
 	return token.kind == TOKEN_EOF;
 }
@@ -666,7 +666,7 @@ inline bool expect_token(TokenKind kind)
     }
 }
 
-void keyword_test()
+void keyword_test(void)
 {
 	init_keywords();
 	assert(is_keyword_name(first_keyword));
@@ -685,7 +685,7 @@ void keyword_test()
 #define assert_token_str(x) assert(strcmp(token.str_val, (x)) == 0 && match_token(TOKEN_STR))
 #define assert_token_eof() assert(is_token(0))
 
-void lex_test()
+void lex_test(void)
 {
 	keyword_test();
 

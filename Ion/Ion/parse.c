@@ -1,10 +1,10 @@
-Decl* parse_decl_opt();
-Decl* parse_decl();
-Typespec* parse_type();
-Stmt* parse_stmt();
-Expr* parse_expr();
+Decl* parse_decl_opt(void);
+Decl* parse_decl(void);
+Typespec* parse_type(void);
+Stmt* parse_stmt(void);
+Expr* parse_expr(void);
 
-Typespec* parse_type_func()
+Typespec* parse_type_func(void)
 {
 	Typespec** args = NULL;
 	expect_token(TOKEN_LPAREN);
@@ -22,10 +22,10 @@ Typespec* parse_type_func()
 	{
 		ret = parse_type();
 	}
-	return typespec_func(ast_dup(args, buf_sizeof(args)), buf_len(args), ret);
+	return typespec_func(args, buf_len(args), ret);
 }
 
-Typespec* parse_type_base()
+Typespec* parse_type_base(void)
 {
 	if (is_token(TOKEN_NAME))
 	{
@@ -50,7 +50,7 @@ Typespec* parse_type_base()
 	}
 }
 
-Typespec* parse_type()
+Typespec* parse_type(void)
 {
 	Typespec* type = parse_type_base();
 	while (is_token(TOKEN_LBRACKET) || is_token(TOKEN_MUL))
@@ -88,14 +88,14 @@ Expr* parse_expr_compound(Typespec* type)
 		}
 	}
 	expect_token(TOKEN_RBRACE);
-	return expr_compound(type, ast_dup(args, buf_sizeof(args)), buf_len(args));
+	return expr_compound(type, args, buf_len(args));
 }
 
-Expr* parse_expr_operand()
+Expr* parse_expr_operand(void)
 {
 	if (is_token(TOKEN_INT))
 	{
-		uint64_t val = token.int_val;
+		int64_t val = token.int_val;
 		next_token();
 		return expr_int(val);
 	}
@@ -166,7 +166,7 @@ Expr* parse_expr_operand()
 	}
 }
 
-Expr* parse_expr_base()
+Expr* parse_expr_base(void)
 {
 	Expr* expr = parse_expr_operand();
 	while (is_token(TOKEN_LPAREN) || is_token(TOKEN_LBRACKET) || is_token(TOKEN_DOT))
@@ -183,7 +183,7 @@ Expr* parse_expr_base()
 				}
 			}
 			expect_token(TOKEN_RPAREN);
-			expr = expr_call(expr, ast_dup(args, buf_sizeof(args)), buf_len(args));
+			expr = expr_call(expr, args, buf_len(args));
 		}
 		else if (match_token(TOKEN_LBRACKET))
 		{
@@ -203,12 +203,12 @@ Expr* parse_expr_base()
 	return expr;
 }
 
-bool is_unary_op()
+bool is_unary_op(void)
 {
 	return is_token(TOKEN_ADD) || is_token(TOKEN_SUB) || is_token(TOKEN_MUL) || is_token(TOKEN_AND);
 }
 
-Expr* parse_expr_unary()
+Expr* parse_expr_unary(void)
 {
 	if (is_unary_op())
 	{
@@ -222,12 +222,12 @@ Expr* parse_expr_unary()
 	}
 }
 
-bool is_mul_op()
+bool is_mul_op(void)
 {
     return TOKEN_FIRST_MUL <= token.kind && token.kind <= TOKEN_LAST_MUL;
 }
 
-Expr* parse_expr_mul()
+Expr* parse_expr_mul(void)
 {
 	Expr* expr = parse_expr_unary();
 	while (is_mul_op())
@@ -239,12 +239,12 @@ Expr* parse_expr_mul()
 	return expr;
 }
 
-bool is_add_op()
+bool is_add_op(void)
 {
 	return TOKEN_FIRST_ADD <= token.kind && token.kind <= TOKEN_LAST_ADD;
 }
 
-Expr* parse_expr_add()
+Expr* parse_expr_add(void)
 {
 	Expr* expr = parse_expr_mul();
 	while (is_add_op())
@@ -256,12 +256,12 @@ Expr* parse_expr_add()
 	return expr;
 }
 
-bool is_cmp_op()
+bool is_cmp_op(void)
 {
 	return TOKEN_FIRST_CMP <= token.kind && token.kind <= TOKEN_LAST_CMP;
 }
 
-Expr* parse_expr_cmp()
+Expr* parse_expr_cmp(void)
 {
 	Expr* expr = parse_expr_add();
 	while (is_cmp_op())
@@ -273,7 +273,7 @@ Expr* parse_expr_cmp()
 	return expr;
 }
 
-Expr* parse_expr_and()
+Expr* parse_expr_and(void)
 {
 	Expr* expr = parse_expr_cmp();
 	while (match_token(TOKEN_AND_AND))
@@ -283,7 +283,7 @@ Expr* parse_expr_and()
 	return expr;
 }
 
-Expr* parse_expr_or()
+Expr* parse_expr_or(void)
 {
 	Expr* expr = parse_expr_and();
 	while (match_token(TOKEN_OR_OR))
@@ -293,7 +293,7 @@ Expr* parse_expr_or()
 	return expr;
 }
 
-Expr* parse_expr_ternary()
+Expr* parse_expr_ternary(void)
 {
 	Expr* expr = parse_expr_or();
 	if (match_token(TOKEN_QUESTION))
@@ -306,12 +306,12 @@ Expr* parse_expr_ternary()
 	return expr;
 }
 
-Expr* parse_expr()
+Expr* parse_expr(void)
 {
 	return parse_expr_ternary();
 }
 
-Expr* parse_paren_expr()
+Expr* parse_paren_expr(void)
 {
 	expect_token(TOKEN_LPAREN);
 	Expr* expr = parse_expr();
@@ -319,7 +319,7 @@ Expr* parse_paren_expr()
 	return expr;
 }
 
-StmtBlock parse_stmt_block()
+StmtList parse_stmt_block(void)
 {
 	expect_token(TOKEN_LBRACE);
 	Stmt** stmts = NULL;
@@ -328,14 +328,14 @@ StmtBlock parse_stmt_block()
 		buf_push(stmts, parse_stmt());
 	}
 	expect_token(TOKEN_RBRACE);
-	return (StmtBlock) { ast_dup(stmts, buf_sizeof(stmts)), buf_len(stmts) };
+	return stmt_list(stmts, buf_len(stmts));
 }
 
-Stmt* parse_stmt_if()
+Stmt* parse_stmt_if(void)
 {
 	Expr* cond = parse_paren_expr();
-	StmtBlock then_block = parse_stmt_block();
-	StmtBlock else_block = { 0 };
+    StmtList then_block = parse_stmt_block();
+    StmtList else_block = { 0 };
 	ElseIf* elseifs = NULL;
 	while (match_keyword(else_keyword))
 	{
@@ -345,21 +345,21 @@ Stmt* parse_stmt_if()
 			break;
 		}
 		Expr* elseif_cond = parse_paren_expr();
-		StmtBlock elseif_block = parse_stmt_block();
+        StmtList elseif_block = parse_stmt_block();
 		buf_push(elseifs, (ElseIf) { elseif_cond, elseif_block });
 	}
-	return stmt_if(cond, then_block, ast_dup(elseifs, buf_sizeof(elseifs)), buf_len(elseifs), else_block);
+	return stmt_if(cond, then_block, elseifs, buf_len(elseifs), else_block);
 }
 
-Stmt* parse_stmt_while()
+Stmt* parse_stmt_while(void)
 {
 	Expr* cond = parse_paren_expr();
 	return stmt_while(cond, parse_stmt_block());
 }
 
-Stmt* parse_stmt_do_while()
+Stmt* parse_stmt_do_while(void)
 {
-	StmtBlock block = parse_stmt_block();
+    StmtList block = parse_stmt_block();
 	if (!match_keyword(while_keyword))
 	{
 		fatal_syntax_error("Expected 'while' after 'do' block");
@@ -371,12 +371,12 @@ Stmt* parse_stmt_do_while()
 	return stmt;
 }
 
-bool is_assign_op()
+bool is_assign_op(void)
 {
 	return TOKEN_FIRST_ASSIGN <= token.kind && token.kind <= TOKEN_LAST_ASSIGN;
 }
 
-Stmt* parse_simple_stmt()
+Stmt* parse_simple_stmt(void)
 {
 	Expr* expr = parse_expr();
 	Stmt* stmt;
@@ -408,7 +408,7 @@ Stmt* parse_simple_stmt()
 	return stmt;
 }
 
-Stmt* parse_stmt_for()
+Stmt* parse_stmt_for(void)
 {
 	expect_token(TOKEN_LPAREN);
 	Stmt* init = NULL;
@@ -436,7 +436,7 @@ Stmt* parse_stmt_for()
 	return stmt_for(init, cond, next, parse_stmt_block());
 }
 
-SwitchCase parse_stmt_switch_case()
+SwitchCase parse_stmt_switch_case(void)
 {
 	Expr** exprs = NULL;
 	bool is_default = false;
@@ -463,11 +463,11 @@ SwitchCase parse_stmt_switch_case()
 	{
 		buf_push(stmts, parse_stmt());
 	}
-	StmtBlock block = { ast_dup(stmts, buf_sizeof(stmts)), buf_len(stmts) };
-	return (SwitchCase) { ast_dup(exprs, buf_sizeof(exprs)), buf_len(exprs), is_default, block };
+    StmtList block = stmt_list(stmts, buf_len(stmts));
+	return (SwitchCase) { exprs, buf_len(exprs), is_default, block };
 }
 
-Stmt* parse_stmt_switch()
+Stmt* parse_stmt_switch(void)
 {
 	Expr* expr = parse_paren_expr();
 	SwitchCase* cases = NULL;
@@ -477,10 +477,10 @@ Stmt* parse_stmt_switch()
 		buf_push(cases, parse_stmt_switch_case());
 	}
 	expect_token(TOKEN_RBRACE);
-	return stmt_switch(expr, ast_dup(cases, buf_sizeof(cases)), buf_len(cases));
+	return stmt_switch(expr, cases, buf_len(cases));
 }
 
-Stmt* parse_stmt()
+Stmt* parse_stmt(void)
 {
 	if (match_keyword(if_keyword))
 	{
@@ -539,14 +539,14 @@ Stmt* parse_stmt()
 	}
 }
 
-const char* parse_name()
+const char* parse_name(void)
 {
 	const char* name = token.name;
 	expect_token(TOKEN_NAME);
 	return name;
 }
 
-EnumItem parse_decl_enum_item()
+EnumItem parse_decl_enum_item(void)
 {
 	const char* name = parse_name();
 	Expr* init = NULL;
@@ -557,7 +557,7 @@ EnumItem parse_decl_enum_item()
 	return (EnumItem) { name, init };
 }
 
-Decl* parse_decl_enum()
+Decl* parse_decl_enum(void)
 {
 	const char* name = parse_name();
 	expect_token(TOKEN_LBRACE);
@@ -571,10 +571,10 @@ Decl* parse_decl_enum()
 		}		
 	}
 	expect_token(TOKEN_RBRACE);
-	return decl_enum(name, ast_dup(items, buf_sizeof(items)), buf_len(items));
+	return decl_enum(name, items, buf_len(items));
 }
 
-AggregateItem parse_decl_aggregate_item()
+AggregateItem parse_decl_aggregate_item(void)
 {
 	const char** names = NULL;
 	buf_push(names, parse_name());
@@ -585,7 +585,7 @@ AggregateItem parse_decl_aggregate_item()
 	expect_token(TOKEN_COLON);
 	Typespec* type = parse_type();
 	expect_token(TOKEN_SEMICOLON);
-	return (AggregateItem) { ast_dup(names, buf_sizeof(names)), buf_len(names), type };
+	return (AggregateItem) {names, buf_len(names), type };
 }
 
 Decl* parse_decl_aggregate(DeclKind kind)
@@ -599,10 +599,10 @@ Decl* parse_decl_aggregate(DeclKind kind)
 		buf_push(items, parse_decl_aggregate_item());
 	}
 	expect_token(TOKEN_RBRACE);
-	return decl_aggregate(kind, name, ast_dup(items, buf_sizeof(items)), buf_len(items));
+	return decl_aggregate(kind, name, items, buf_len(items));
 }
 
-Decl* parse_decl_var()
+Decl* parse_decl_var(void)
 {
 	const char* name = parse_name();
 	if (match_token(TOKEN_ASSIGN))
@@ -626,21 +626,21 @@ Decl* parse_decl_var()
 	}
 }
 
-Decl* parse_decl_const()
+Decl* parse_decl_const(void)
 {
 	const char* name = parse_name();
 	expect_token(TOKEN_ASSIGN);
 	return decl_const(name, parse_expr());
 }
 
-Decl* parse_decl_typedef()
+Decl* parse_decl_typedef(void)
 {
 	const char* name = parse_name();
 	expect_token(TOKEN_ASSIGN);
 	return decl_typedef(name, parse_type());
 }
 
-FuncParam parse_decl_func_param()
+FuncParam parse_decl_func_param(void)
 {
 	const char* name = parse_name();
 	expect_token(TOKEN_COLON);
@@ -648,7 +648,7 @@ FuncParam parse_decl_func_param()
 	return (FuncParam) { name, type };
 }
 
-Decl* parse_decl_func()
+Decl* parse_decl_func(void)
 {
 	const char* name = parse_name();
 	expect_token(TOKEN_LPAREN);
@@ -667,11 +667,11 @@ Decl* parse_decl_func()
 	{
 		ret_type = parse_type();
 	}
-	StmtBlock block = parse_stmt_block();
-	return decl_func(name, ast_dup(params, buf_sizeof(params)), buf_len(params), ret_type, block);
+	StmtList block = parse_stmt_block();
+	return decl_func(name, params, buf_len(params), ret_type, block);
 }
 
-Decl* parse_decl_opt()
+Decl* parse_decl_opt(void)
 {
 	if (match_keyword(enum_keyword))
 	{
@@ -707,7 +707,7 @@ Decl* parse_decl_opt()
 	}
 }
 
-Decl* parse_decl()
+Decl* parse_decl(void)
 {
     Decl* decl = parse_decl_opt();
     if (!decl)
@@ -717,7 +717,7 @@ Decl* parse_decl()
     return decl;
 }
 
-void parse_test()
+void parse_test(void)
 {
     const char* decls[] = {
         "func f() { do { print(42); } while(1); }",

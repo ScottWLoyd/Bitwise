@@ -21,7 +21,7 @@ void flush_print_buf(FILE* file)
 	}
 }
 
-void print_newline()
+void print_newline(void)
 {
     printf("\n%.*s", 2 * indent, "                                                                      ");
 }
@@ -160,7 +160,7 @@ void print_expr(Expr* expr)
     }
 }
 
-void print_stmt_block(StmtBlock block)
+void print_stmt_block(StmtList block)
 {
     assert(block.num_stmts != 0);
     printf("(block");
@@ -183,10 +183,10 @@ void print_stmt(Stmt* stmt)
             break;
         case STMT_RETURN:
             printf("(return");
-			if (s->return_stmt.expr)
+			if (s->expr)
 			{
 				printf(" ");
-				print_expr(s->return_stmt.expr);
+				print_expr(s->expr);
 			}
             printf(")");
             break;
@@ -402,7 +402,7 @@ void print_decl(Decl* decl)
     }
 }
 
-void print_test()
+void print_test(void)
 {
 	use_print_buf = true;
     Expr* exprs[] = {
@@ -429,7 +429,7 @@ void print_test()
 		stmt_break(),
 		stmt_continue(),
 		stmt_block(
-			(StmtBlock) {
+			(StmtList) {
 		(Stmt*[]) {
 		stmt_break(),
 			stmt_continue()
@@ -441,7 +441,7 @@ void print_test()
 		stmt_init("x", expr_int(42)),
 		stmt_if(
 			expr_name("flag1"),
-			(StmtBlock) {
+			(StmtList) {
 		(Stmt*[]) {
 		stmt_return(expr_int(1))
 	},
@@ -449,7 +449,7 @@ void print_test()
 	},
 			(ElseIf[]) {
 		expr_name("flag2"),
-			(StmtBlock) {
+			(StmtList) {
 			(Stmt*[]) {
 			stmt_return(expr_int(2))
 		},
@@ -457,7 +457,7 @@ void print_test()
 		}
 	},
 			1,
-		(StmtBlock) {
+		(StmtList) {
 		(Stmt*[]) {
 		stmt_return(expr_int(3))
 	},
@@ -466,7 +466,7 @@ void print_test()
 	),
 		stmt_while(
 			expr_name("running"),
-			(StmtBlock) {
+			(StmtList) {
 		(Stmt*[]) {
 		stmt_assign(TOKEN_ADD_ASSIGN, expr_name("i"), expr_int(16)),
 	},
@@ -482,7 +482,7 @@ void print_test()
 				},
 						2,
 						false,
-						(StmtBlock) {
+						(StmtList) {
 						(Stmt*[]) {
 						stmt_return(expr_name("val"))
 					},
@@ -493,7 +493,7 @@ void print_test()
 					(Expr*[]){expr_int(1)},
 					1,
 							true,
-							(StmtBlock) {
+							(StmtList) {
 							(Stmt*[]) {
 							stmt_return(expr_int(0))
 						},
