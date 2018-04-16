@@ -130,9 +130,9 @@ char* buf__printf(char* buf, const char* fmt, ...)
 	{
         buf_fit(buf, n + buf_len(buf));
         va_start(args, fmt);
-        cap = buf_cap(buf) - buf_len(buf);
-        n = 1 + vsnprintf(buf_end(buf), cap, fmt, args);
-        assert(n <= cap);
+        size_t new_cap = buf_cap(buf) - buf_len(buf);
+        n = 1 + vsnprintf(buf_end(buf), new_cap, fmt, args);
+        assert(n <= new_cap);
         va_end(args);
 	}
 	buf__hdr(buf)->len += n - 1;

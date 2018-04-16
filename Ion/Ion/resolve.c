@@ -218,15 +218,15 @@ void sym_builtin(const char* name)
 
 void sym_enum_const(const char* name, Decl* decl)
 {
-    if (sym_get(decl->name))
+    if (sym_get(name))
     {
-        fatal("Duplicate name");
+        fatal("Duplicate name: '%s'", decl->name);
     }
     buf_push(global_syms, (Sym) {
         .kind = SYM_ENUM_CONST,
         .name = name,
         .state = SYM_UNORDERED,
-        .decl = decl,
+        .decl = decl
     });
 }
 
@@ -274,11 +274,19 @@ void order_name(const char* name)
         return;
     }
     sym->state = SYM_ORDERING;
-    order_decl(sym->decl);
     sym->state = SYM_ORDERED;
     if (sym->kind == SYM_DECL)
     {
+        order_decl(sym->decl);
         buf_push(ordered_decls, sym->decl);
+    }
+    else if (sym->kind == SYM_ENUM_CONST)
+    {
+        order_name(sym->decl->name);
+    }
+    else
+    {
+        assert(0);
     }
 }
 
@@ -419,52 +427,6 @@ void order_decls(void)
     }
 }
 
-#if 0
-void resolve_decl(Decl* decl)
-{
-    switch (decl->kind)
-    {
-        case DECL_CONST:
-            break;
-    }
-}
-
-void resolve_sym(Sym* sym)
-{
-    if (sym->state == SYM_ORDERED)
-    {
-        return;
-    }
-
-    if (sym->state == SYM_ORDERING)
-    {
-        fatal("Cyclic dependency");
-        return;
-    }
-    resolve_decl(sym->decl);
-}
-
-Sym* resolve_name(const char* name)
-{
-    Sym* sym = sym_get(name);
-    if (!sym)
-    {
-        fatal("Unknown name");
-        return NULL;
-    }
-    resolve_sym(sym);
-    return sym;
-}
-
-void resolve_syms(void)
-{
-    for (Sym* it = global_syms; it != buf_end(global_syms); it++)
-    {
-        resolve_sym(it);
-    }
-}
-#endif
-
 void resolve_test(void)
 {
     const char* foo = str_intern("foo");
@@ -501,9 +463,9 @@ void order_test(void)
         //"struct S { t: T; }",
         //"struct T { i: int[n]; }",
         //"const n = 1024",
-        "enum E { A, B, C }"
-        "struct S { t: T*; }",
-        "struct T { s: S*; }",
+        "struct S { t: T; }",
+        "struct T { s: S*[B]; }",
+        "enum E { A, B, C }",
     };
     sym_builtin(str_intern("int"));
     sym_builtin(str_intern("float"));
@@ -513,11 +475,9 @@ void order_test(void)
         Decl* decl = parse_decl();
         sym_decl(decl);
     }
-   
     order_decls();
     for (size_t i = 0; i < buf_len(ordered_decls); i++)
     {
-        
         printf("%s\n", ordered_decls[i]->name);
     }
 }
