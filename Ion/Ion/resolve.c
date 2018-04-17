@@ -113,6 +113,7 @@ Type* type_array(Type* elem, size_t size)
     Type* type = type_alloc(TYPE_ARRAY);
     type->array.elem = elem;
     type->array.size = type_sizeof(elem);
+    type->size = size * type->array.size;
     buf_push(cached_array_types, (CachedArrayType) { elem, size, type });
     return type;
 }
@@ -656,12 +657,12 @@ void resolve_test(void)
         "var p: T*",
         "var u = *p",
         "struct T { a: int[n]; }",
-        "var r = &t.a",
         "var t: T",
         "typedef S = int[n+m]",
+        "var r = &t.a",
         "const m = sizeof(t.a)",
-        "var i = n + m",
         "var q = &i",
+        "var i = n + m",
     };
 
     for (size_t i = 0; i < sizeof(code) / sizeof(*code); i++)
