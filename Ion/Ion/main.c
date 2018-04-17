@@ -25,8 +25,8 @@ void run_tests(void)
     lex_test();
     //print_test();
 	//parse_test();
-	//resolve_test();
-    order_test();
+	resolve_test();
+    //order_test();
 }
 
 int main(int ArgCount, char** Args)

@@ -720,7 +720,6 @@ Decl* parse_decl(void)
 void parse_test(void)
 {
     const char* decls[] = {
-        "func f() { do { print(42); } while(1); }",
         "const y = sizeof(:int*[3])",
         "const y = sizeof(1+3)",
         "var x = b == 1 ? 1+2 : 3-4",
@@ -735,6 +734,7 @@ void parse_test(void)
         "var v: Vector = {1.0, -1.0}",
         "union IntOrFloat { i: int; f: float; }",
         "typedef Vectors = Vector[1+2]",
+        "func f() { do { print(42); } while(1); }",
         "typedef T = (func(int):int)[16]",
         "func f() { enum E { A, B, C } return; }",
         "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
