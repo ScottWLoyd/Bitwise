@@ -124,6 +124,13 @@ Expr* parse_expr_operand(void)
 			return expr_name(name);
 		}
 	}
+    else if (match_keyword(cast_keyword))
+    {
+        expect_token(TOKEN_LPAREN);
+        Typespec* type = parse_type();
+        expect_token(TOKEN_RPAREN);
+        return expr_cast(type, parse_expr());
+    }
 	else if (match_keyword(sizeof_keyword))
 	{
 		expect_token(TOKEN_LPAREN);
@@ -205,7 +212,7 @@ Expr* parse_expr_base(void)
 
 bool is_unary_op(void)
 {
-	return is_token(TOKEN_ADD) || is_token(TOKEN_SUB) || is_token(TOKEN_MUL) || is_token(TOKEN_AND);
+	return is_token(TOKEN_ADD) || is_token(TOKEN_SUB) || is_token(TOKEN_MUL) || is_token(TOKEN_AND) || is_token(TOKEN_NEG) || is_token(TOKEN_NOT);
 }
 
 Expr* parse_expr_unary(void)

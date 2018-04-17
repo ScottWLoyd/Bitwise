@@ -311,7 +311,7 @@ void print_aggregate_decl(Decl* decl)
         print_newline();
         printf("(");
         for (const char** name = it->names; name != it->names + it->num_names; name++) {
-            printf("%s", *name);
+            printf("%s ", *name);
         }
         print_typespec(it->type);
         printf(")");

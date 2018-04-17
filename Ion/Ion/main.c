@@ -24,7 +24,7 @@ void run_tests(void)
     common_test();
     lex_test();
     //print_test();
-	parse_test();
+	//parse_test();
 	resolve_test();    
 }
 
