@@ -3,6 +3,7 @@ typedef enum TypeKind {
     TYPE_INCOMPLETE,
     TYPE_COMPLETING,
     TYPE_VOID,
+    TYPE_CHAR,
     TYPE_INT,
     TYPE_FLOAT,
     TYPE_PTR,
@@ -57,13 +58,10 @@ Type* type_alloc(TypeKind kind)
     return t;
 }
 
-Type type_void_val = { TYPE_VOID, 4 };
-Type type_int_val = { TYPE_INT, 4 };
-Type type_float_val = { TYPE_FLOAT, 4 };
-
-Type* type_void = &type_void_val;
-Type* type_int = &type_int_val;
-Type* type_float = &type_float_val;
+Type* type_void = &(Type) { TYPE_VOID, 0 };
+Type* type_char = &(Type) { TYPE_CHAR, 1 };
+Type* type_int = &(Type) { TYPE_INT, 4 };
+Type* type_float = &(Type) { TYPE_FLOAT, 4 };
 const size_t PTR_SIZE = 8;
 
 size_t type_sizeof(Type* type)
@@ -339,7 +337,7 @@ ResolvedExpr resolved_const(int64_t val)
 }
 
 Entity* resolve_name(const char* name);
-int64_t resolve_int_const_expr(Expr* expr);
+int64_t resolve_const_expr(Expr* expr);
 ResolvedExpr resolve_expected_expr(Expr* expr, Type* expected_type);
 ResolvedExpr resolve_expr(Expr* expr);
 
@@ -360,7 +358,7 @@ Type* resolve_typespec(Typespec* typespec)
             return type_ptr(resolve_typespec(typespec->ptr.elem));
         case TYPESPEC_ARRAY:
             return type_array(resolve_typespec(typespec->array.elem), 
-                resolve_int_const_expr(typespec->array.size));
+                resolve_const_expr(typespec->array.size));
         case TYPESPEC_FUNC: {
             Type** args = NULL;
             for (size_t i = 0; i < typespec->func.num_args; i++)
@@ -544,6 +542,18 @@ ResolvedExpr resolve_expr_field(Expr* expr)
     return resolved_null;
 }
 
+ResolvedExpr ptr_decay(ResolvedExpr expr)
+{
+    if (expr.type->kind == TYPE_ARRAY)
+    {
+        return resolved_rvalue(type_ptr(expr.type->array.elem));
+    }
+    else
+    {
+        return expr;
+    }
+}
+
 ResolvedExpr resolve_expr_name(Expr* expr)
 {
     assert(expr->kind == EXPR_NAME);
@@ -639,6 +649,7 @@ ResolvedExpr resolve_expr_unary(Expr* expr)
     switch (expr->unary.op)
     {
         case TOKEN_MUL:
+            operand = ptr_decay(operand);
             if (type->kind != TYPE_PTR)
             {
                 fatal("Cannot deref a non-ptr type");
@@ -777,13 +788,13 @@ ResolvedExpr resolve_expr_call(Expr* expr)
 ResolvedExpr resolve_expr_ternary(Expr* expr, Type* expected_type)
 {
     assert(expr->kind == EXPR_TERNARY);
-    ResolvedExpr cond = resolve_expr(expr->ternary.cond);
+    ResolvedExpr cond = ptr_decay(resolve_expr(expr->ternary.cond));
     if (cond.type->kind != TYPE_INT && cond.type->kind != TYPE_PTR)
     {
         fatal("Ternary cond expression must have type int or ptr");
     }
-    ResolvedExpr then_expr = resolve_expected_expr(expr->ternary.if_true, expected_type);
-    ResolvedExpr else_expr = resolve_expected_expr(expr->ternary.if_false, expected_type);
+    ResolvedExpr then_expr = ptr_decay(resolve_expected_expr(expr->ternary.if_true, expected_type));
+    ResolvedExpr else_expr = ptr_decay(resolve_expected_expr(expr->ternary.if_false, expected_type));
     if (then_expr.type != else_expr.type)
     {
         fatal("Ternary then/else expressions must have matching types");
@@ -801,32 +812,24 @@ ResolvedExpr resolve_expr_ternary(Expr* expr, Type* expected_type)
 ResolvedExpr resolve_expr_index(Expr* expr)
 {
     assert(expr->kind == EXPR_INDEX);
-    ResolvedExpr operand = resolve_expr(expr->index.expr);
-    ResolvedExpr index = resolve_expr(expr->index.index);
-    if (operand.type->kind != TYPE_PTR && operand.type->kind != TYPE_ARRAY)
+    ResolvedExpr operand = ptr_decay(resolve_expr(expr->index.expr));
+    if (operand.type->kind != TYPE_PTR)
     {
         fatal("Can only index arrays or pointers");
     }
+    ResolvedExpr index = resolve_expr(expr->index.index);
     if (index.type->kind != TYPE_INT)
     {
         fatal("Index expression must have type int");
     }
-    if (operand.type->kind == TYPE_PTR)
-    {
-        return resolved_lvalue(operand.type->ptr.elem);
-    }
-    else
-    {
-        assert(operand.type->kind == TYPE_ARRAY);
-        return resolved_lvalue(operand.type->array.elem);
-    }
+    return resolved_lvalue(operand.type->ptr.elem);
 }
 
 ResolvedExpr resolve_expr_cast(Expr* expr)
 {
     assert(expr->kind == EXPR_CAST);
     Type* type = resolve_typespec(expr->cast.type);
-    ResolvedExpr result = resolve_expr(expr->cast.expr);
+    ResolvedExpr result = ptr_decay(resolve_expr(expr->cast.expr));
     if (type->kind == TYPE_PTR)
     {
         if (result.type->kind != TYPE_PTR && result.type->kind != TYPE_INT)
@@ -854,24 +857,28 @@ ResolvedExpr resolve_expected_expr(Expr* expr, Type* expected_type)
     {
         case EXPR_INT:
             return resolved_const(expr->int_val);
+        case EXPR_FLOAT:
+            return resolved_rvalue(type_float);
+        case EXPR_STR:
+            return resolved_rvalue(type_ptr(type_char));
         case EXPR_NAME:
             return resolve_expr_name(expr);
-        case EXPR_COMPOUND:
-            return resolve_expr_compound(expr, expected_type);
         case EXPR_CAST:
             return resolve_expr_cast(expr);
-        case EXPR_FIELD:
-            return resolve_expr_field(expr);
+        case EXPR_CALL:
+            return resolve_expr_call(expr);
         case EXPR_INDEX:
             return resolve_expr_index(expr);
+        case EXPR_FIELD:
+            return resolve_expr_field(expr);
+        case EXPR_COMPOUND:
+            return resolve_expr_compound(expr, expected_type);
         case EXPR_UNARY:
             return resolve_expr_unary(expr);
         case EXPR_BINARY:
             return resolve_expr_binary(expr);
         case EXPR_TERNARY:
             return resolve_expr_ternary(expr, expected_type);
-        case EXPR_CALL:
-            return resolve_expr_call(expr);
         case EXPR_SIZEOF_EXPR: {
             ResolvedExpr result = resolve_expr(expr->sizeof_expr);
             Type* type = result.type;
@@ -894,7 +901,7 @@ ResolvedExpr resolve_expr(Expr* expr)
     return resolve_expected_expr(expr, NULL);
 }
 
-int64_t resolve_int_const_expr(Expr* expr)
+int64_t resolve_const_expr(Expr* expr)
 {
     ResolvedExpr result = resolve_expr(expr);
     if (!result.is_const)
@@ -925,17 +932,28 @@ void resolve_test(void)
     assert(int_func == type_func(NULL, 0, type_int));
 
     entity_install_type(str_intern("void"), type_void);
+    entity_install_type(str_intern("char"), type_char);
     entity_install_type(str_intern("int"), type_int);
+    entity_install_type(str_intern("float"), type_float);
 
     const char* code[] = {
-
+        "var a: int[3] = {1, 2, 3}",
+        "var b: int[4]",
+        "var p = &a[1]",
+        "var i = p[1]",
+        "var j = *p",
+        "const n = sizeof(a)",
+        "const m = sizeof(&a[0])",
+        "const l = sizeof(1 ? a : b)",
+        /*
+        "var pi = 3.14",
+        "var name = \"test\"",
         "struct Vector { x, y: int; }",
         "var v = Vector{1,2}",
         "var i = 42",
         "var p = cast(void*)i",
         "var j = cast(int)p",
         "var q = cast(int*)j",
-        /*
         "const i = 42",
         "const j = -i",
         "const k = +i",
@@ -950,7 +968,6 @@ void resolve_test(void)
         "union IntOrPtr { i: int; p: int*; }",
         "var i = 42",
         "var u = IntOrPtr{ i, &i}",
-        "var a: int[3] = {1, 2, 3}",
         "const n = 1 + sizeof(p)",
         "var p: T*",
         "var u = *p",
