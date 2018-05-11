@@ -3,6 +3,8 @@ typedef struct Stmt Stmt;
 typedef struct Decl Decl;
 typedef struct Typespec Typespec;
 
+struct Type;
+
 typedef struct StmtList {
     Stmt** stmts;
     size_t num_stmts;
@@ -18,6 +20,8 @@ typedef enum TypespecKind {
 
 typedef struct Typespec {
     TypespecKind kind;
+    SrcLoc loc;
+    struct Type* type;
     union {
         const char* name;
         struct {
@@ -64,7 +68,9 @@ typedef struct EnumItem {
 
 typedef struct Decl {
     DeclKind kind;
+    SrcLoc loc;
     const char* name;
+    struct Sym* sym;
     union {
         struct {
             EnumItem* items;
@@ -93,6 +99,11 @@ typedef struct Decl {
     };
 } Decl;
 
+typedef struct DeclSet {
+    Decl** decls;
+    size_t num_decls;
+} DeclSet;
+
 typedef enum ExprKind {
     EXPR_NONE,
     EXPR_INT,
@@ -111,8 +122,25 @@ typedef enum ExprKind {
 	EXPR_SIZEOF_EXPR,
 } ExprKind;
 
+typedef enum CompundFieldKind {
+    FIELD_DEFAULT,
+    FIELD_NAME,
+    FIELD_INDEX,
+} CompoundFieldKind;
+
+typedef struct CompoundField {
+    CompoundFieldKind kind;
+    Expr* init;
+    union {
+        const char* name;
+        Expr* index;
+    };
+} CompoundField;
+
 typedef struct Expr {
     ExprKind kind;
+    SrcLoc loc;
+    struct Type* type;
     union {
         int64_t int_val;
         double float_val;
@@ -122,8 +150,8 @@ typedef struct Expr {
 		Typespec* sizeof_type;
         struct {
             Typespec* type;
-            Expr** args;
-            size_t num_args;
+            CompoundField* fields;
+            size_t num_fields;
         } compound;
         struct {
             Typespec* type;
@@ -191,6 +219,7 @@ typedef struct SwitchCase {
 
 typedef struct Stmt {
     StmtKind kind;
+    SrcLoc loc;
     union {
         Expr* expr;
 		Decl* decl;

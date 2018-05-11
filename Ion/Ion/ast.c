@@ -33,6 +33,7 @@ StmtList stmt_list(Stmt** stmts, size_t num_stmts)
 Typespec* typespec_new(TypespecKind kind) 
 {
 	Typespec* type = ast_alloc(sizeof(Typespec));
+    type->loc = (SrcLoc) { src_name, src_line };
 	type->kind = kind;
 	return type;
 }
@@ -72,9 +73,18 @@ Typespec* typespec_func(Typespec** args, size_t num_args, Typespec* ret)
 // Declarations
 //
 
+DeclSet* decl_set(Decl** decls, size_t num_decls)
+{
+    DeclSet* declset = ast_alloc(sizeof(DeclSet));
+    declset->decls = AST_DUP(decls);
+    declset->num_decls = num_decls;
+    return declset;
+}
+
 Decl* decl_new(DeclKind kind, const char* name)
 {
     Decl* decl = ast_alloc(sizeof(Decl));
+    decl->loc = (SrcLoc) { src_name, src_line };
     decl->kind = kind;
     decl->name = name;
     return decl;
@@ -151,6 +161,7 @@ Decl* decl_typedef(const char* name, Typespec* type)
 
 Expr* expr_new(ExprKind kind) {
 	Expr* expr = ast_alloc(sizeof(Expr));
+    expr->loc = (SrcLoc) { src_name, src_line };
 	expr->kind = kind;
 	return expr;
 }
@@ -193,10 +204,10 @@ Expr* expr_sizeof_expr(Expr* expr)
 	return new_expr;
 }
 
-Expr* expr_compound(Typespec* type, Expr** args, size_t num_args) {
+Expr* expr_compound(Typespec* type, CompoundField* fields, size_t num_fields) {
     Expr* new_expr = expr_new(EXPR_COMPOUND);
-    new_expr->compound.args = AST_DUP(args);
-    new_expr->compound.num_args = num_args;
+    new_expr->compound.fields = AST_DUP(fields);
+    new_expr->compound.num_fields = num_fields;
     new_expr->compound.type = type;
     return new_expr;
 }
@@ -261,6 +272,7 @@ Stmt* stmt_new(StmtKind kind)
 {
     Stmt* s = ast_alloc(sizeof(Stmt));
     s->kind = kind;
+    s->loc = (SrcLoc) { src_name, src_line };
     return s;
 }
 

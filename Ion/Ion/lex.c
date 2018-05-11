@@ -32,8 +32,8 @@ void init_keywords(void)
 	{
 		return;
 	}
-	char* arena_end = str_arena.end;
 	KEYWORD(typedef);
+    char* arena_end = str_arena.end;
 	KEYWORD(enum);
 	KEYWORD(struct);
 	KEYWORD(union);
@@ -222,6 +222,9 @@ typedef struct Token
 
 Token token;
 const char* stream;
+const char* line_start;
+int src_line;
+const char* src_name;
 
 const char* token_info(void)
 {
@@ -485,7 +488,11 @@ repeat:
         case ' ': case '\n': case '\r': case '\t': case '\v': {
 			while (isspace(*stream))
 			{
-				stream++;
+                if (*stream++ == '\n')
+                {
+                    line_start = stream;
+                    src_line++;
+                }
 			}
 			goto repeat;
         } break;
@@ -568,6 +575,24 @@ repeat:
                 stream++;
             }
         } break;
+        case '/': {
+            token.kind = TOKEN_DIV;
+            stream++;
+            if (*stream == '=')
+            {
+                token.kind = TOKEN_DIV_ASSIGN;
+                stream++;
+            }
+            else if (*stream == '/')
+            {
+                stream++;
+                while (*stream && *stream != '\n')
+                {
+                    stream++;
+                }
+                goto repeat;
+            }
+        } break;
 
         CASE1('\0', TOKEN_EOF)
         CASE1('(', TOKEN_LPAREN)
@@ -585,7 +610,6 @@ repeat:
         CASE2('=', TOKEN_ASSIGN, '=', TOKEN_EQ)
         CASE2('^', TOKEN_XOR, '=', TOKEN_XOR_ASSIGN)
         CASE2('*', TOKEN_MUL, '=', TOKEN_MUL_ASSIGN)
-        CASE2('/', TOKEN_DIV, '=', TOKEN_DIV_ASSIGN)
         CASE2('%', TOKEN_MOD, '=', TOKEN_MOD_ASSIGN)
         CASE3('+', TOKEN_ADD, '=', TOKEN_ADD_ASSIGN, '+', TOKEN_INC)
         CASE3('-', TOKEN_SUB, '=', TOKEN_SUB_ASSIGN, '-', TOKEN_DEC)
@@ -605,9 +629,12 @@ repeat:
 #undef CASE2
 #undef CASE3
 
-void init_stream(const char* str)
+void init_stream(const char* name, const char* buf)
 {
-    stream = str;
+    stream = buf;
+    src_name = name ? name : "<anonymous>";
+    src_line = 1;
+    line_start = stream;
     next_token();
 }
 
@@ -693,9 +720,10 @@ void keyword_test(void)
 void lex_test(void)
 {
 	keyword_test();
+    assert(str_intern("func") == func_keyword);
 
     // Integer literal tests
-    init_stream("0 18446744073709551615 0xffffffffffffffff 042 0b0101");
+    init_stream(NULL, "0 18446744073709551615 0xffffffffffffffff 042 0b0101");
     assert_token_int(0);
     assert_token_int(18446744073709551615ull);
     assert(token.mod == TOKENMOD_HEX);
@@ -707,7 +735,7 @@ void lex_test(void)
     assert_token_eof();
 
     // Float literal tests
-    init_stream("3.14 0.123 42. 3.13e-10");
+    init_stream(NULL, "3.14 0.123 42. 3.13e-10");
     assert_token_float(3.14);
     assert_token_float(0.123);
     assert_token_float(42.);
@@ -715,19 +743,19 @@ void lex_test(void)
     assert_token_eof();
 
     // Char literal tests
-    init_stream("'a' '\\n'");
+    init_stream(NULL, "'a' '\\n'");
     assert_token_int('a');
     assert_token_int('\n');
     assert_token_eof();
 
     // String literal tests
-    init_stream("\"foo\" \"a\\nb\"");
+    init_stream(NULL, "\"foo\" \"a\\nb\"");
     assert_token_str("foo");
     assert_token_str("a\nb");
     assert_token_eof();
 
     // Operator tests
-    init_stream(": := + += ++ < <= << <<=");
+    init_stream(NULL, ": := + += ++ < <= << <<=");
     assert_token(TOKEN_COLON);
     assert_token(TOKEN_COLON_ASSIGN);
     assert_token(TOKEN_ADD);
@@ -740,7 +768,7 @@ void lex_test(void)
     assert_token_eof();
 
     // Misc tests
-    init_stream("XY+(XY)_Hello1,234+554");
+    init_stream(NULL, "XY+(XY)_Hello1,234+554");
     assert_token_name("XY");
     assert_token(TOKEN_ADD);
     assert_token(TOKEN_LPAREN);

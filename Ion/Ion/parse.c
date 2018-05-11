@@ -75,20 +75,45 @@ Typespec* parse_type(void)
 	return type;
 }
 
+CompoundField parse_expr_compound_field(void) {
+    if (match_token(TOKEN_LBRACKET)) 
+    {
+        Expr* index = parse_expr();
+        expect_token(TOKEN_RBRACKET);
+        expect_token(TOKEN_ASSIGN);
+        return (CompoundField) { FIELD_INDEX, parse_expr(), .index = index };
+    }
+    else
+    {
+        Expr* expr = parse_expr();
+        if (match_token(TOKEN_ASSIGN))
+        {
+            if (expr->kind != EXPR_NAME)
+            {
+                fatal_syntax_error("Named initializer in compound literal must be preceded by field name");
+            }
+            return (CompoundField) { FIELD_NAME, parse_expr(), .name = expr->name };
+        }
+        else {
+            return (CompoundField) { FIELD_DEFAULT, expr };
+        }
+    }
+}
+
 Expr* parse_expr_compound(Typespec* type)
 {
 	expect_token(TOKEN_LBRACE);
-	Expr** args = NULL;
+    CompoundField* fields = NULL;
 	if (!is_token(TOKEN_RBRACE))
 	{
-		buf_push(args, parse_expr());
+		buf_push(fields, parse_expr_compound_field());
 		while (match_token(TOKEN_COMMA))
 		{
-			buf_push(args, parse_expr());
+			buf_push(fields, parse_expr_compound_field());
 		}
 	}
 	expect_token(TOKEN_RBRACE);
-	return expr_compound(type, args, buf_len(args));
+	return expr_compound(type, fields, buf_len(fields));
 }
 
 Expr* parse_expr_operand(void)
@@ -128,8 +153,10 @@ Expr* parse_expr_operand(void)
     {
         expect_token(TOKEN_LPAREN);
         Typespec* type = parse_type();
+        expect_token(TOKEN_COMMA);
+        Expr* expr = parse_expr();
         expect_token(TOKEN_RPAREN);
-        return expr_cast(type, parse_expr());
+        return expr_cast(type, expr);
     }
 	else if (match_keyword(sizeof_keyword))
 	{
@@ -212,7 +239,12 @@ Expr* parse_expr_base(void)
 
 bool is_unary_op(void)
 {
-	return is_token(TOKEN_ADD) || is_token(TOKEN_SUB) || is_token(TOKEN_MUL) || is_token(TOKEN_AND) || is_token(TOKEN_NEG) || is_token(TOKEN_NOT);
+	return is_token(TOKEN_ADD) || 
+           is_token(TOKEN_SUB) || 
+           is_token(TOKEN_MUL) || 
+           is_token(TOKEN_AND) || 
+           is_token(TOKEN_NEG) || 
+           is_token(TOKEN_NOT);
 }
 
 Expr* parse_expr_unary(void)
@@ -724,9 +756,23 @@ Decl* parse_decl(void)
     return decl;
 }
 
+DeclSet* parse_file(void)
+{
+    Decl** decls = NULL;
+    while (!is_token(TOKEN_EOF))
+    {
+        buf_push(decls, parse_decl());
+    }
+    return decl_set(decls, buf_len(decls));
+}
+
 void parse_test(void)
 {
     const char* decls[] = {
+        "var x: char[256] = {1, 2, 3, ['a'] = 4}",
+        "struct Vector { x, y: float; }",
+        "var v = Vector{1.0, -1.0}",
+        "var v: Vector = {1.0, -1.0}",
         "const y = sizeof(:int*[3])",
         "const y = sizeof(1+3)",
         "var x = b == 1 ? 1+2 : 3-4",
@@ -736,9 +782,6 @@ void parse_test(void)
         "func f(x: int): bool { switch(x) { case 0: case 1: return true; case 2: default: return false; } }",
         "enum Color { RED=3, GREEN, BLUE=0 }",
         "const pi = 3.14",
-        "struct Vector { x, y: float; }",
-        "var v = Vector{1.0, -1.0}",
-        "var v: Vector = {1.0, -1.0}",
         "union IntOrFloat { i: int; f: float; }",
         "typedef Vectors = Vector[1+2]",
         "func f() { do { print(42); } while(1); }",
@@ -749,7 +792,7 @@ void parse_test(void)
 
 	for (const char** it = decls; it != decls + sizeof(decls) / sizeof(*decls); it++)
 	{
-		init_stream(*it);
+		init_stream(NULL, *it);
 		Decl* decl = parse_decl();
 		print_decl(decl);
 		printf("\n");

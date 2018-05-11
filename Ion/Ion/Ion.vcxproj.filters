@@ -36,6 +36,15 @@
     <ClCompile Include="resolve.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="error.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ion.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="syntax.txt" />
@@ -44,5 +53,13 @@
     <ClInclude Include="ast.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="generate_test.py">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="test1.ion">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
