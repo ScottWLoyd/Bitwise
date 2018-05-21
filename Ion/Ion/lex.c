@@ -5,7 +5,6 @@ const char* union_keyword;
 const char* var_keyword;
 const char* const_keyword;
 const char* func_keyword;
-const char* cast_keyword;
 const char* sizeof_keyword;
 const char* break_keyword;
 const char* continue_keyword;
@@ -33,14 +32,13 @@ void init_keywords(void)
 		return;
 	}
 	KEYWORD(typedef);
-    char* arena_end = str_arena.end;
+    char* arena_end = intern_arena.end;
 	KEYWORD(enum);
 	KEYWORD(struct);
 	KEYWORD(union);
 	KEYWORD(const);
 	KEYWORD(var);
 	KEYWORD(func);
-    KEYWORD(cast);
 	KEYWORD(sizeof);
 	KEYWORD(break);
 	KEYWORD(continue);
@@ -53,7 +51,7 @@ void init_keywords(void)
 	KEYWORD(switch);
 	KEYWORD(case);
 	KEYWORD(default);
-	assert(str_arena.end == arena_end);
+	assert(intern_arena.end == arena_end);
 	first_keyword = typedef_keyword;
 	last_keyword = default_keyword;
 	inited = true;
@@ -206,10 +204,16 @@ const char* token_kind_name(TokenKind kind)
 	}
 }
 
+typedef struct SrcPos {
+    const char* name;
+    int line;
+} SrcPos;
+
 typedef struct Token
 {
     TokenKind kind;
     TokenMod mod;
+    SrcPos pos;
     const char* start;
     const char* end;
     union {
@@ -223,8 +227,20 @@ typedef struct Token
 Token token;
 const char* stream;
 const char* line_start;
-int src_line;
-const char* src_name;
+
+void error(SrcPos pos, const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    printf("%s(%d): ", pos.name, pos.line);
+    vprintf(fmt, args);
+    printf("\n");
+    va_end(args);
+}
+
+#define fatal_error(...) (error(__VA_ARGS__), exit(1))
+#define syntax_error(...) (error(token.pos, __VA_ARGS__))
+#define fatal_syntax_error(...) (syntax_error(__VA_ARGS__), exit(1))
 
 const char* token_info(void)
 {
@@ -491,7 +507,7 @@ repeat:
                 if (*stream++ == '\n')
                 {
                     line_start = stream;
-                    src_line++;
+                    token.pos.line++;
                 }
 			}
 			goto repeat;
@@ -632,9 +648,9 @@ repeat:
 void init_stream(const char* name, const char* buf)
 {
     stream = buf;
-    src_name = name ? name : "<anonymous>";
-    src_line = 1;
     line_start = stream;
+    token.pos.name = name ? name : "<stream>";
+    token.pos.line = 1;
     next_token();
 }
 
@@ -693,7 +709,7 @@ inline bool expect_token(TokenKind kind)
     }
     else
     {     
-        fatal("expected token: %s, got %s\n", token_kind_name(kind), token_info());
+        fatal_syntax_error("expected token: %s, got %s\n", token_kind_name(kind), token_info());
         return false;
     }
 }

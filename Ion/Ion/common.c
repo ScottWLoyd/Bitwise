@@ -5,6 +5,17 @@
 #define ALIGN_DOWN_PTR(p, a) ((void*)ALIGN_DOWN((uintptr_t)(p), (a)))
 #define ALIGN_UP_PTR(p, a) ((void*)ALIGN_UP((uintptr_t)(p), (a)))
 
+void fatal(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    printf("FATAL: ");
+    vprintf(fmt, args);
+    printf("\n");
+    va_end(args);
+    exit(1);
+}
+
 void* xcalloc(size_t num_items, size_t item_size)
 {
 	void* ptr = calloc(num_items, item_size);
@@ -67,20 +78,17 @@ char* read_file(const char* path)
     }
 
     fseek(file, 0, SEEK_END);
-    long size = ftell(file);
+    long len = ftell(file);
     fseek(file, 0, SEEK_SET);
-    char* buf = xmalloc(size + 1);
-    if (size != 0)
+    char* buf = xmalloc(len + 1);
+    if (len && fread(buf, len, 1, file) != 1)
     {
-        if (fread(buf, size, 1, file) != 1)
-        {
             fclose(file);
             free(buf);
             return NULL;
-        }
     }
     fclose(file);
-    buf[size] = 0;
+    buf[len] = 0;
     return buf;
 }
 
@@ -91,28 +99,22 @@ bool write_file(const char* path, const char* buf, size_t len)
     {
         return false;
     }
-
-    bool result = false;
-    if (fwrite(buf, len, 1, file) != 1)
-    {
-        goto done;
-    }
-    result = true;
-done:
+    size_t n = fwrite(buf, len, 1, file);
     fclose(file);
-    return result;
+    return n == 1;
 }
 
 const char* get_ext(const char* path)
 {
-    for (const char* ptr = path + strlen(path); ptr != path; ptr--)
+    const char* ext = NULL;
+    for (; *path; path++)
     {
-        if (ptr[-1] == '.')
+        if (*path == '.')
         {
-            return ptr;
+            ext = path + 1;
         }
     }
-    return NULL;
+    return ext;
 }
 
 char* replace_ext(const char* path, const char* new_ext)
@@ -196,7 +198,7 @@ void buf_test(void)
 {
     int* asdf = NULL;
     int N = 1027;
-    for (int i = 0; i<N; i++)
+    for (size_t i = 0; i<N; i++)
         buf_push(asdf, i);
     assert(buf_len(asdf) == N);
     buf_free(asdf);
@@ -255,94 +257,85 @@ void arena_free(Arena* arena)
 // Hash map
 //
 
-uint64_t uint64_hash(uint64_t x)
+uint64_t hash_uint64(uint64_t x)
 {
-    x *= 0xff51afd7ed558ccdul;
+    x *= 0xff51afd7ed558ccd;
     x ^= x >> 32;
     return x;
 }
 
-uint64_t ptr_hash(void *ptr)
+uint64_t hash_ptr(void *ptr)
 {
-    return uint64_hash((uintptr_t)ptr);
+    return hash_uint64((uintptr_t)ptr);
 }
 
-uint64_t str_hash(const char* str, size_t len)
+uint64_t hash_bytes(const char* buf, size_t len)
 {
-    uint64_t fnv_init = 14695981039346656037ull;
-    uint64_t fnv_mul = 1099511628211ull;
-    uint64_t h = fnv_init;
+    uint64_t x = 0xcbf29ce484222325;
     for (size_t i = 0; i < len; i++)
     {
-        h ^= str[i];
-        h *= fnv_mul;
+        x ^= buf[i];
+        x *= 0x100000001b3;
+        x ^= x >> 32;
     }
-    return h;
+    return x;
 }
 
-typedef struct MapEntry {
-    void* key;
-    void* val;
-    uint64_t hash;
-} MapEntry;
-
 typedef struct Map {
-    MapEntry* entries;
+    void** keys;
+    void** vals;
     size_t len;
     size_t cap;
 } Map;
 
-void* map_get_hashed(Map* map, void* key, uint64_t hash)
+void* map_get(Map* map, void* key)
 {
     if (map->len == 0)
     {
         return NULL;
     }
     assert(IS_POW2(map->cap));
-    uint32_t i = (uint32_t)(hash & (map->cap - 1));
+    size_t i = (size_t)hash_ptr(key);
     assert(map->len < map->cap);
     for (;;)
     {
-        MapEntry* entry = map->entries + i;
-        if (entry->key == key)
+        i &= map->cap - 1;
+        if (map->keys[i] == key)
         {
-            return entry->val;
+            return map->vals[i];
         }
-        else if (!entry->key)
+        else if (!map->keys[i])
         {
             return NULL;
         }
-        i++;
-        if (i == map->cap)
-        {
-            i = 0;
-        }
+        i++;        
     }
     return NULL;
 }
 
-void** map_put_hashed(Map* map, void* key, void* val, uint64_t hash);
+void map_put(Map* map, void* key, void* val);
 
 void map_grow(Map* map, size_t new_cap)
 {
     new_cap = MAX(16, new_cap);
     Map new_map = {
-        .entries = xcalloc(new_cap, sizeof(MapEntry)),
+        .keys = xcalloc(new_cap, sizeof(void*)),
+        .vals = xmalloc(new_cap * sizeof(void*)),
         .cap = new_cap
     };
     for (size_t i = 0; i < map->cap; i++)
     {
-        MapEntry* entry = map->entries + i;
-        if (entry->key)
+        if (map->keys[i])
         {
-            map_put_hashed(&new_map, entry->key, entry->val, entry->hash);
+            map_put(&new_map, map->keys[i], map->vals[i]);
         }
     }
-    free(map->entries);
+    free(map->keys);
+    free(map->vals);
     *map = new_map;
 }
 
-void** map_put_hashed(Map* map, void* key, void* val, uint64_t hash)
+void map_put(Map* map, void* key, void* val)
 {
     assert(key);
     assert(val);
@@ -352,39 +345,24 @@ void** map_put_hashed(Map* map, void* key, void* val, uint64_t hash)
     }
     assert(2 * map->len < map->cap);
     assert(IS_POW2(map->cap));
-    uint32_t i = (uint32_t)(hash & (map->cap - 1));
+    size_t i = (size_t)hash_ptr(key);
     for (;;)
     {
-        MapEntry* entry = map->entries + i;
-        if (!entry->key)
+        i &= map->cap - 1;
+        if (!map->keys[i])
         {
             map->len++;
-            entry->key = key;
-            entry->val = val;
-            entry->hash = hash;
-            return &entry->val;
-        } 
-        else if (entry->key == key)
+            map->keys[i] = key;
+            map->vals[i] = val;
+            return;
+        }
+        else if (map->keys[i] == key)
         {
-            entry->val = val;
-            return &entry->val;
+            map->vals[i] = val;
+            return;
         }
         i++;
-        if (i == map->cap)
-        {
-            i = 0;
-        }
     }
-}
-
-void** map_put(Map* map, void* key, void* val)
-{
-    return map_put_hashed(map, key, val, ptr_hash(key));
-}
-
-void* map_get(Map* map, void* key)
-{
-    return map_get_hashed(map, key, ptr_hash(key));
 }
 
 void map_test(void)
@@ -412,14 +390,15 @@ typedef struct Intern {
     char str[];
 } Intern;
 
-Arena str_arena;
+Arena intern_arena;
 Map interns;
 
 const char* str_intern_range(const char* start, const char* end)
 {
     size_t len = end - start;
-    uint64_t hash = str_hash(start, len) | 1;
-    Intern* intern = map_get_hashed(&interns, (void*)hash, hash);
+    uint64_t hash = hash_bytes(start, len);
+    void* key = (void*)(uintptr_t)(hash ? hash : 1);
+    Intern* intern = map_get(&interns, key);
     for(Intern* it = intern; it; it = it->next)
     {
         if (it->len == len && strncmp(it->str, start, len) == 0)
@@ -427,12 +406,12 @@ const char* str_intern_range(const char* start, const char* end)
             return it->str;
         }
     }
-    Intern* new_intern = arena_alloc(&str_arena, offsetof(Intern, str) + len + 1);
+    Intern* new_intern = arena_alloc(&intern_arena, offsetof(Intern, str) + len + 1);
     new_intern->len = len;
     new_intern->next = intern;
     memcpy(new_intern->str, start, len);
     new_intern->str[len] = 0;
-    map_put_hashed(&interns, (void*)hash, new_intern, hash);
+    map_put(&interns, key, new_intern);
     return new_intern->str;
 }
 

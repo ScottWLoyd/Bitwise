@@ -39,9 +39,6 @@
     <ClCompile Include="gen.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="error.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ion.c">
       <Filter>Source Files</Filter>
     </ClCompile>

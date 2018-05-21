@@ -6,6 +6,7 @@ typedef struct Typespec Typespec;
 struct Type;
 
 typedef struct StmtList {
+    SrcPos pos;
     Stmt** stmts;
     size_t num_stmts;
 } StmtList;
@@ -20,7 +21,7 @@ typedef enum TypespecKind {
 
 typedef struct Typespec {
     TypespecKind kind;
-    SrcLoc loc;
+    SrcPos pos;
     struct Type* type;
     union {
         const char* name;
@@ -51,24 +52,27 @@ typedef enum DeclKind {
 } DeclKind;
 
 typedef struct FuncParam {
+    SrcPos pos;
     const char* name;
     Typespec* type;
 } FuncParam;
 
 typedef struct AggregateItem {
+    SrcPos pos;
     const char** names;
     size_t num_names;
     Typespec* type;
 } AggregateItem;
 
 typedef struct EnumItem {
+    SrcPos pos;
     const char* name;
     Expr* init;
 } EnumItem;
 
 typedef struct Decl {
     DeclKind kind;
-    SrcLoc loc;
+    SrcPos pos;
     const char* name;
     struct Sym* sym;
     union {
@@ -130,6 +134,7 @@ typedef enum CompundFieldKind {
 
 typedef struct CompoundField {
     CompoundFieldKind kind;
+    SrcPos pos;
     Expr* init;
     union {
         const char* name;
@@ -139,7 +144,7 @@ typedef struct CompoundField {
 
 typedef struct Expr {
     ExprKind kind;
-    SrcLoc loc;
+    SrcPos pos;
     struct Type* type;
     union {
         int64_t int_val;
@@ -219,7 +224,7 @@ typedef struct SwitchCase {
 
 typedef struct Stmt {
     StmtKind kind;
-    SrcLoc loc;
+    SrcPos pos;
     union {
         Expr* expr;
 		Decl* decl;

@@ -433,6 +433,7 @@ void print_decl(Decl* decl)
 
 void print_test(void)
 {
+#if 0
 	use_print_buf = true;
     Expr* exprs[] = {
         expr_binary(TOKEN_ADD, expr_int(1), expr_int(2)),
@@ -538,6 +539,7 @@ void print_test(void)
 	}
 	flush_print_buf(stdout);
 	use_print_buf = false;
+#endif
 }
 
 

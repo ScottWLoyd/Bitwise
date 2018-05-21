@@ -12,7 +12,6 @@
 #include <inttypes.h>
 
 #include "common.c"
-#include "error.c"
 #include "lex.c"
 #include "ast.h"
 #include "ast.c"
@@ -26,15 +25,15 @@ void main_test(void)
 {
     common_test();
     lex_test();
-    //print_test();
-	//parse_test();
-	//resolve_test();
-    //gen_test();
+    print_test();
+	parse_test();
+	resolve_test();
+    gen_test();
     ion_test();
 }
 
 int main(int ArgCount, char** Args)
 {
-    // main_test();
-    return ion_main(ArgCount, Args);
+    main_test();
+    //return ion_main(ArgCount, Args);
 }
