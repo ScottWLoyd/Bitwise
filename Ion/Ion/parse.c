@@ -60,13 +60,13 @@ Typespec* parse_type(void)
 	{
 		if (match_token(TOKEN_LBRACKET))
 		{
-			Expr* expr = NULL;
+			Expr* size = NULL;
 			if (!is_token(TOKEN_RBRACKET))
 			{
-				expr = parse_expr();
+				size = parse_expr();
 			}
 			expect_token(TOKEN_RBRACKET);
-			type = typespec_array(pos, type, expr);
+			type = typespec_array(pos, type, size);
 		}
 		else
 		{
@@ -109,24 +109,26 @@ Expr* parse_expr_compound(Typespec* type)
     SrcPos pos = token.pos;
 	expect_token(TOKEN_LBRACE);
     CompoundField* fields = NULL;
-	if (!is_token(TOKEN_RBRACE))
+	while (!is_token(TOKEN_RBRACE))
 	{
 		buf_push(fields, parse_expr_compound_field());
-		while (match_token(TOKEN_COMMA))
+		if (!match_token(TOKEN_COMMA))
 		{
-			buf_push(fields, parse_expr_compound_field());
+            break;
 		}
 	}
 	expect_token(TOKEN_RBRACE);
 	return expr_compound(pos, type, fields, buf_len(fields));
 }
 
+Expr* parse_expr_unary(void);
+
 Expr* parse_expr_operand(void)
 {
     SrcPos pos = token.pos;
 	if (is_token(TOKEN_INT))
 	{
-		int64_t val = token.int_val;
+		int val = token.int_val;
 		next_token();
 		return expr_int(pos, val);
 	}
@@ -187,7 +189,7 @@ Expr* parse_expr_operand(void)
             }
             else
             {
-                return expr_cast(pos, type, parse_expr());
+                return expr_cast(pos, type, parse_expr_unary());
             }
 			
 		}
@@ -498,6 +500,10 @@ SwitchCase parse_stmt_switch_case(void)
 		if (match_keyword(case_keyword))
 		{
 			buf_push(exprs, parse_expr());
+            while (match_token(TOKEN_COMMA))
+            {
+                buf_push(exprs, parse_expr());
+            }
 		}
 		else 
 		{
@@ -617,12 +623,12 @@ Decl* parse_decl_enum(SrcPos pos)
 	const char* name = parse_name();
 	expect_token(TOKEN_LBRACE);
 	EnumItem* items = NULL;
-	if (!is_token(TOKEN_RBRACE))
+	while (!is_token(TOKEN_RBRACE))
 	{
 		buf_push(items, parse_decl_enum_item());
-		while (match_token(TOKEN_COMMA))
+		if (!match_token(TOKEN_COMMA))
 		{
-			buf_push(items, parse_decl_enum_item());
+            break;
 		}		
 	}
 	expect_token(TOKEN_RBRACE);

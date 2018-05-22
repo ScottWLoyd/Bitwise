@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include "common.c"
 #include "lex.c"
@@ -24,12 +25,12 @@
 void main_test(void)
 {
     common_test();
-    lex_test();
-    print_test();
-	parse_test();
+    // lex_test();
+    // print_test();
+	// parse_test();
 	resolve_test();
-    gen_test();
-    ion_test();
+    // gen_test();
+    // ion_test();
 }
 
 int main(int ArgCount, char** Args)

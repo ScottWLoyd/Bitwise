@@ -7,6 +7,7 @@ int gen_indent;
 SrcPos gen_pos;
 
 const char* gen_preamble = \
+    "// Preamble\n"
     "#include <stdio.h>\n\n";
 
 void genln(void)
@@ -49,8 +50,11 @@ void gen_sync_pos(SrcPos pos)
 {
     if (gen_pos.line != pos.line || gen_pos.name != pos.name)
     {
-        genlnf("#line %d ", pos.line);
-        gen_str(pos.name);
+        genlnf("#line %d", pos.line);
+        if (gen_pos.name != pos.name) {
+            genf(" ");
+            gen_str(pos.name);
+        }
         gen_pos = pos;
     }
 }
@@ -214,10 +218,6 @@ void gen_forward_decls(void)
             case DECL_UNION:
                 genlnf("typedef union %s %s;", sym->name, sym->name);
                 break;
-            case DECL_FUNC:
-                gen_func_decl(sym->decl);
-                genf(";");
-                break;
             default:
                 break;
         }
@@ -232,14 +232,50 @@ void gen_aggregate(Decl* decl)
     for (size_t i = 0; i < decl->aggregate.num_items; i++)
     {
         AggregateItem item = decl->aggregate.items[i];
-        gen_sync_pos(item.pos);
         for (size_t j = 0; j < item.num_names; j++)
         {
+            gen_sync_pos(item.pos);
             genlnf("%s;", typespec_to_cdecl(item.type, item.names[j]));
         }
     }
     gen_indent--;
     genlnf("};");
+}
+
+void gen_expr_compound(Expr* expr, bool is_init)
+{
+    if (is_init)
+    {
+        genf("{");
+    }
+    else if (expr->compound.type)
+    {
+        genf("(%s){", typespec_to_cdecl(expr->compound.type, ""));
+    }
+    else
+    {
+        genf("(%s){", type_to_cdecl(expr->type, ""));
+    }
+    for (size_t i = 0; i < expr->compound.num_fields; i++)
+    {
+        if (i != 0)
+        {
+            genf(", ");
+        }
+        CompoundField field = expr->compound.fields[i];
+        if (field.kind == FIELD_NAME)
+        {
+            genf(".%s = ", field.name);
+        }
+        else if (field.kind == FIELD_INDEX)
+        {
+            genf("[");
+            gen_expr(field.index);
+            genf("] = ");
+        }
+        gen_expr(field.init);
+    }
+    genf("}");
 }
 
 void gen_expr(Expr* expr)
@@ -287,14 +323,8 @@ void gen_expr(Expr* expr)
             genf(".%s", expr->field.name);
             break;
         case EXPR_COMPOUND:
-            if (expr->compound.type)
-            {
-                genf("(%s){", typespec_to_cdecl(expr->compound.type, ""));
-            }
-            else 
-            {
-                genf("(%s){", type_to_cdecl(expr->type, ""));
-            }
+            gen_expr_compound(expr, false);
+            break;
             for (size_t i = 0; i < expr->compound.num_fields; i++)
             {
                 if (i != 0)
@@ -364,12 +394,24 @@ void gen_stmt_block(StmtList block)
     genlnf("}");
 }
 
+void gen_init_expr(Expr* expr)
+{
+    if (expr->kind == EXPR_COMPOUND)
+    {
+        gen_expr_compound(expr, true);
+    }
+    else
+    {
+        gen_expr(expr);
+    }
+}
+
 void gen_simple_stmt(Stmt* stmt)
 {
     switch (stmt->kind)
     {
         case STMT_EXPR:
-            gen_expr(stmt->expr);
+            gen_init_expr(stmt->expr);
             break;
         case STMT_INIT:
             genf("%s = ", type_to_cdecl(stmt->init.expr->type, stmt->init.name));
@@ -499,7 +541,16 @@ void gen_stmt(Stmt* stmt)
                     genlnf("default:");
                 }
                 genf(" ");
-                gen_stmt_block(switch_case.block);
+                genf("{");
+                gen_indent++;
+                StmtList block = switch_case.block;
+                for (size_t j = 0; j < block.num_stmts; j++)
+                {
+                    gen_stmt(block.stmts[j]);
+                }
+                genlnf("break;");
+                gen_indent--;
+                genlnf("}");
             }
             genlnf("}");
             break;
@@ -511,15 +562,12 @@ void gen_stmt(Stmt* stmt)
     }
 }
 
-void gen_func(Decl* decl)
+bool is_incomplete_array_type(Typespec* typespec)
 {
-    assert(decl->kind == DECL_FUNC);
-    gen_func_decl(decl);
-    genf(" ");
-    gen_stmt_block(decl->func.block);
+    return typespec->kind == TYPESPEC_ARRAY && !typespec->array.size;
 }
 
-void gen_sym(Sym* sym)
+void gen_decl(Sym* sym)
 {
     Decl* decl = sym->decl;
     if (!decl)
@@ -535,7 +583,7 @@ void gen_sym(Sym* sym)
             genf(" };");
             break;
         case DECL_VAR:
-            if (decl->var.type)
+            if (decl->var.type && !is_incomplete_array_type(decl->var.type))
             {
                 genlnf("%s", typespec_to_cdecl(decl->var.type, sym->name));
             }
@@ -546,31 +594,33 @@ void gen_sym(Sym* sym)
             if (decl->var.expr)
             {
                 genf(" = ");
-                gen_expr(decl->var.expr);
+                gen_init_expr(decl->var.expr);
             }
             genf(";");
             break;
         case DECL_FUNC:
-            gen_func(sym->decl);
+            gen_func_decl(sym->decl);
+            genf(";");
             break;
         case DECL_STRUCT:
         case DECL_UNION:
-            gen_aggregate(sym->decl);
+            gen_aggregate(decl);
             break;
         case DECL_TYPEDEF:
-            genlnf("typedef %s;", type_to_cdecl(sym->type, sym->name));
+            genlnf("typedef %s;", typespec_to_cdecl(decl->typedef_decl.type, sym->name));
             break;
         default:
             assert(0);
             break;
     }
+    genln();
 }
 
-void gen_ordered_decls(void)
+void gen_sorted_decls(void)
 {
-    for (size_t i = 0; i < buf_len(ordered_syms); i++)
+    for (size_t i = 0; i < buf_len(sorted_syms); i++)
     {
-        gen_sym(ordered_syms[i]);
+        gen_decl(sorted_syms[i]);
     }
 }
 
@@ -588,6 +638,22 @@ void cdecl_test(void)
     char* cdecl9 = type_to_cdecl(type_func(NULL, 0, type_array(type_func(NULL, 0, type_int), 10)), "x");
 }
 
+void gen_func_defs(void)
+{
+    for (Sym** it = global_syms_buf; it != buf_end(global_syms_buf); it++)
+    {
+        Sym* sym = *it;
+        Decl* decl = sym->decl;
+        if (decl && decl->kind == DECL_FUNC)
+        {
+            gen_func_decl(decl);
+            genf(" ");
+            gen_stmt_block(decl->func.block);
+            genln();
+        }
+    }
+}
+
 void gen_all(void)
 {
     gen_buf = NULL;
@@ -595,50 +661,8 @@ void gen_all(void)
     genf("// Forward declarations");
     gen_forward_decls();
     genln();
-    genlnf("// Ordered declarations");
-    gen_ordered_decls();
-}
-
-void gen_test(void)
-{
-    cdecl_test();
-
-    const char* code =
-        "func example_test(): int { return fact_rec(10) == fact_iter(10); }\n"
-        "union IntOrPtr { i: int; p: int*; }\n"
-        //"func f() {\n"
-        //"    u1 := IntOrPtr{i = 42};\n"
-        //"    u2 := IntOrPtr{p = (:int*)42};\n"
-        //"    u1.i = 0;\n"
-        //"    u2.p = (:int*)0;\n"
-        //"}\n"
-        "var i: int\n"
-        "struct Vector { x, y: int; }\n"
-        "func fact_iter(n: int): int { r := 1; for (i := 2; i <= n; i++) { r *= i; } return r; }\n"
-        "func fact_rec(n: int): int { if (n == 0) { return 1; } else { return n * fact_rec(n-1); } }\n"
-        "const n = 1+sizeof(p)\n"
-        "var p: T*\n"
-        "struct T { a: int[n]; }\n";
-#if 0
-    "func f1() { v := Vector{1, 2}; j := i; i++; j++; v.x = 2*j; }\n"
-        "func f2(n: int): int { return 2*n; }\n"
-        "func f3(x: int): int { if (x) { return -x; } else if (x % 2 == 0) { return 42; } else { return -1; } }\n"
-        "func f4(n: int): int { for (i := 0; i < n; i++) { if (i % 3 == 0) { return n; } } return 0; }\n"
-        "func f5(x: int): int { switch(x) { case 0: case 1: return 42; case 3: default: return -1; } }\n"
-        "func f6(n: int): int { p := 1; while (n) { p *= 2; n--; } return p; }\n"
-        "func f7(n: int): int { p := 1; do { p *= 2; n--; } while (n); return p; }\n"
-#endif
-
-    init_stream(NULL, code);
-    init_global_syms();
-    sym_global_decls(parse_file());
-    finalize_syms();
-
-    gen_all();
-    printf("%s\n", gen_buf);
-
-#if 0
-    extern int example_test(void);
-    printf("example_test() == %d\n", example_test());
-#endif
+    genlnf("// Sorted declarations");
+    gen_sorted_decls();
+    genlnf("// Function definitions");
+    gen_func_defs();
 }

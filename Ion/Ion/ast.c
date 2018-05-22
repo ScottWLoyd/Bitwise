@@ -180,7 +180,7 @@ Expr* expr_sizeof_expr(SrcPos pos, Expr* expr)
     return new_expr;
 }
 
-Expr* expr_int(SrcPos pos, int64_t int_val) {
+Expr* expr_int(SrcPos pos, int int_val) {
 	Expr* new_expr = expr_new(EXPR_INT, pos);
 	new_expr->int_val = int_val;
 	return new_expr;

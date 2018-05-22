@@ -77,7 +77,7 @@ void print_expr(Expr* expr)
     {
         case EXPR_NONE: assert(0); break;
         case EXPR_INT:
-            printf("%" PRIu64, expr->int_val);
+            printf("%d", expr->int_val);
             break;
         case EXPR_FLOAT:
             printf("%f", expr->float_val);

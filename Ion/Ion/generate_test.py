@@ -50,6 +50,7 @@ struct T(?) {
 }
 """
 
+print("func main(argc: int, argv: char**): int { return 0; }")
 
-for i in range(128 * 1024):
+for i in range(32* 1024):
     print(template.replace("(?)", str(i)))

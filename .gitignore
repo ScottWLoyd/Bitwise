@@ -4,6 +4,7 @@ Ion/x64
 Ion/Ion/Debug
 Ion/Ion/x64
 Ion/Ion.VC.opendb
+Ion/test_project/x64
 
 *.exe
 *.pdb

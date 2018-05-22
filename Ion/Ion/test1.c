@@ -1,74 +1,138 @@
+// Preamble
 #include <stdio.h>
 
 // Forward declarations
-#line 1 "test1.ion"
-int example_test(void);
 typedef union IntOrPtr IntOrPtr;
-#line 10 "test1.ion"
-void f(void);
 typedef struct Vector Vector;
-#line 23 "test1.ion"
-int fact_iter(int n);
-#line 32 "test1.ion"
-int fact_rec(int n);
 typedef struct T T;
-#line 51 "test1.ion"
-int main(int argc, char (*(*argv)));
 
-// Ordered declarations
+// Sorted declarations
 #line 1 "test1.ion"
-int example_test(void) {
-    return (fact_rec(10)) == (fact_iter(10));
-}
-#line 32 "test1.ion"
-int fact_rec(int n) {
-    if ((n) == (0)) {
-        #line 35 "test1.ion"
-        return 1;
-    } else {
-        #line 39 "test1.ion"
-        return (n) * (fact_rec((n) - (1)));
-    }
-}
-#line 23 "test1.ion"
-int fact_iter(int n) {
-    int r = 1;
-    for (int i = 2; (i) <= (n); i++) {
-        #line 27 "test1.ion"
-        r *= i;
-    }
-    return r;
-}
-#line 5 "test1.ion"
+enum { N = ((char)(42)) + (8) };
+
+#line 5
+int h(void);
+
+#line 3
+typedef int (A[(1) + ((2) * (sizeof(h())))]);
+
+#line 13
+typedef IntOrPtr U;
+
+#line 9
+int g(U u);
+
+#line 19
 union IntOrPtr {
     int i;
     int (*p);
 };
-#line 10 "test1.ion"
-void f(void) {
-    IntOrPtr u1 = (IntOrPtr){.i = 42};
-    IntOrPtr u2 = (IntOrPtr){.p = (int *)(42)};
-    u1.i = 0;
-    u2.p = (int *)(0);
-}
-#line 17 "test1.ion"
+
+#line 15
+int example_test(void);
+
+#line 67
+int fact_rec(int n);
+
+#line 58
+int fact_iter(int n);
+
+#line 24
+int (escape_to_char[256]) = {[110] = 10, [114] = 13, [116] = 9, [118] = 11, [98] = 8, [97] = 7, [48] = 0};
+
+#line 34
+int (array[11]) = {1, 2, 3, [10] = 4};
+
+int is_even(int digit);
+
+#line 52
 int i;
-#line 19 "test1.ion"
+
 struct Vector {
     int x;
+    #line 55
     int y;
 };
-#line 45 "test1.ion"
+
+#line 80
 T (*p);
-#line 43 "test1.ion"
+
+#line 78
 enum { n = (1) + (sizeof(p)) };
-#line 47 "test1.ion"
+
+#line 82
 struct T {
     int (a[n]);
 };
-#line 51 "test1.ion"
+
+void benchmark(int n);
+
+#line 94
+int main(int argc, char (*(*argv)));
+
+// Function definitions
+#line 5
+int h(void) {
+    return 42;
+}
+
+int g(U u) {
+    return u.i;
+}
+
+#line 15
+int example_test(void) {
+    return (fact_rec(10)) == (fact_iter(10));
+}
+
+#line 36
+int is_even(int digit) {
+    int b = 0;
+    switch (digit) {
+    case 0:
+    case 2:
+    case 4:
+    case 5:
+    case 8: {
+        #line 40
+        b = 1;
+        break;
+    }
+    }
+    #line 42
+    return b;
+}
+
+#line 58
+int fact_iter(int n) {
+    int r = 1;
+    for (int i = 2; (i) <= (n); i++) {
+        #line 62
+        r *= i;
+    }
+    return r;
+}
+
+int fact_rec(int n) {
+    if ((n) == (0)) {
+        #line 70
+        return 1;
+    } else {
+        #line 74
+        return (n) * (fact_rec((n) - (1)));
+    }
+}
+
+#line 86
+void benchmark(int n) {
+    int r = 1;
+    for (int i = 1; (i) < (n); i++) {
+        #line 90
+        r *= i;
+    }
+}
+
 int main(int argc, char (*(*argv))) {
-    example_test();
-    puts("Hello world!");
+    benchmark(((1024) * (1024)) * (1024));
     return 0;
 }

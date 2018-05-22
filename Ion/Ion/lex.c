@@ -217,7 +217,7 @@ typedef struct Token
     const char* start;
     const char* end;
     union {
-        uint64_t int_val;
+        int int_val;
         double float_val;
         const char* str_val;
         const char* name;
@@ -275,7 +275,7 @@ uint8_t char_to_digit[256] = {
 
 void scan_int(void)
 {
-    uint64_t base = 10;
+    int base = 10;
     if (*stream == '0')
     {
         stream++;
@@ -297,10 +297,10 @@ void scan_int(void)
             token.mod |= TOKENMOD_OCT;
         }
     }
-    uint64_t val = 0;
+    int val = 0;
     for (;;)
     {
-        uint64_t digit = char_to_digit[*(unsigned char*)stream];
+        int digit = char_to_digit[*(unsigned char*)stream];
         if (digit == 0 && *stream != '0')
         {
             break;
@@ -310,7 +310,7 @@ void scan_int(void)
             syntax_error("Digit '%c' out of range for base %llu", *stream, base);
             digit = 0;
         }
-        if (val > (UINT64_MAX - digit) / base)
+        if (val > (INT_MAX - digit) / base)
         {
             syntax_error("Integer literal overflow");
             while (isdigit(*stream))
@@ -739,11 +739,11 @@ void lex_test(void)
     assert(str_intern("func") == func_keyword);
 
     // Integer literal tests
-    init_stream(NULL, "0 18446744073709551615 0xffffffffffffffff 042 0b0101");
+    init_stream(NULL, "0 2147483647 0x7fffffff 042 0b1111");
     assert_token_int(0);
-    assert_token_int(18446744073709551615ull);
+    assert_token_int(2147483647);
     assert(token.mod == TOKENMOD_HEX);
-    assert_token_int(0xffffffffffffffffull);
+    assert_token_int(0x7fffffff);
     assert(token.mod == TOKENMOD_OCT);
     assert_token_int(042);
     assert(token.mod == TOKENMOD_BIN);
