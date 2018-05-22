@@ -11,7 +11,7 @@ const char* gen_preamble = \
 
 void genln(void)
 {
-    genf("\n%.*s", gen_indent * 4);
+    genf("\n%.*s", gen_indent * 4, "                                                                       ");
     gen_pos.line++;
 }
 

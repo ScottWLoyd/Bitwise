@@ -34,6 +34,6 @@ void main_test(void)
 
 int main(int ArgCount, char** Args)
 {
-    main_test();
-    //return ion_main(ArgCount, Args);
+    //main_test();
+    return ion_main(ArgCount, Args);
 }

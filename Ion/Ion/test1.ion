@@ -47,3 +47,9 @@ var p: T*
 struct T {
     a: int[n];
 }
+
+func main(argc: int, argv: char**): int {
+    example_test();
+    puts("Hello world!");
+    return 0;
+}

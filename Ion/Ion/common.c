@@ -135,34 +135,32 @@ char* replace_ext(const char* path, const char* new_ext)
 }
 
 // Stretchy buffers
-typedef struct BufHdr
-{
+typedef struct BufHdr {
     size_t len;
     size_t cap;
-    char buf[0];
+    char buf[];
 } BufHdr;
 
-#define buf__hdr(b) ((BufHdr*)((char*)(b) - offsetof(BufHdr, buf)))
+#define buf__hdr(b) ((BufHdr *)((char *)(b) - offsetof(BufHdr, buf)))
 
-#define buf_len(b)  ((b) ? buf__hdr(b)->len : 0)
-#define buf_cap(b)  ((b) ? buf__hdr(b)->cap : 0)
-#define buf_end(b)  ((b) + buf_len(b))
+#define buf_len(b) ((b) ? buf__hdr(b)->len : 0)
+#define buf_cap(b) ((b) ? buf__hdr(b)->cap : 0)
+#define buf_end(b) ((b) + buf_len(b))
 #define buf_sizeof(b) ((b) ? buf_len(b)*sizeof(*b) : 0)
 
-#define buf_free(b) ((b) ? free(buf__hdr(b)), (b) = NULL : 0)
+#define buf_free(b) ((b) ? (free(buf__hdr(b)), (b) = NULL) : 0)
 #define buf_fit(b, n) ((n) <= buf_cap(b) ? 0 : ((b) = buf__grow((b), (n), sizeof(*(b)))))
 #define buf_push(b, ...) (buf_fit((b), 1 + buf_len(b)), (b)[buf__hdr(b)->len++] = (__VA_ARGS__))
 #define buf_printf(b, ...) ((b) = buf__printf((b), __VA_ARGS__))
 #define buf_clear(b) ((b) ? buf__hdr(b)->len = 0 : 0)
 
-void* buf__grow(const void* buf, size_t new_len, size_t elem_size)
-{
+void *buf__grow(const void *buf, size_t new_len, size_t elem_size) {
     assert(buf_cap(buf) <= (SIZE_MAX - 1) / 2);
-    size_t new_cap = MAX(1 + 2 * buf_cap(buf), new_len);
+    size_t new_cap = MAX(16, MAX(1 + 2 * buf_cap(buf), new_len));
     assert(new_len <= new_cap);
     assert(new_cap <= (SIZE_MAX - offsetof(BufHdr, buf)) / elem_size);
-    size_t new_size = offsetof(BufHdr, buf) + new_cap * elem_size;
-    BufHdr* new_hdr;
+    size_t new_size = offsetof(BufHdr, buf) + new_cap*elem_size;
+    BufHdr *new_hdr;
     if (buf) {
         new_hdr = xrealloc(buf__hdr(buf), new_size);
     }
@@ -174,40 +172,45 @@ void* buf__grow(const void* buf, size_t new_len, size_t elem_size)
     return new_hdr->buf;
 }
 
-char* buf__printf(char* buf, const char* fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
+char *buf__printf(char *buf, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
     size_t cap = buf_cap(buf) - buf_len(buf);
-	size_t n = 1 + vsnprintf(buf_end(buf), cap, fmt, args);
-	va_end(args);
-	if (n > cap)
-	{
+    size_t n = 1 + vsnprintf(buf_end(buf), cap, fmt, args);
+    va_end(args);
+    if (n > cap) {
         buf_fit(buf, n + buf_len(buf));
         va_start(args, fmt);
         size_t new_cap = buf_cap(buf) - buf_len(buf);
         n = 1 + vsnprintf(buf_end(buf), new_cap, fmt, args);
         assert(n <= new_cap);
         va_end(args);
-	}
-	buf__hdr(buf)->len += n - 1;
-	return buf;
+    }
+    buf__hdr(buf)->len += n - 1;
+    return buf;
 }
 
-void buf_test(void)
-{
-    int* asdf = NULL;
-    int N = 1027;
-    for (size_t i = 0; i<N; i++)
-        buf_push(asdf, i);
-    assert(buf_len(asdf) == N);
-    buf_free(asdf);
-	char* str = NULL;
-	buf_printf(str, "One: %d\n", 1);
-	assert(strcmp(str, "One: 1\n") == 0);
-	buf_printf(str, "Hex: 0x%x\n", 0x12345678);
-	assert(strcmp(str, "One: 1\nHex: 0x12345678\n") == 0);
+void buf_test(void) {
+    int *buf = NULL;
+    assert(buf_len(buf) == 0);
+    int n = 1024;
+    for (int i = 0; i < n; i++) {
+        buf_push(buf, i);
+    }
+    assert(buf_len(buf) == n);
+    for (size_t i = 0; i < buf_len(buf); i++) {
+        assert(buf[i] == i);
+    }
+    buf_free(buf);
+    assert(buf == NULL);
+    assert(buf_len(buf) == 0);
+    char *str = NULL;
+    buf_printf(str, "One: %d\n", 1);
+    assert(strcmp(str, "One: 1\n") == 0);
+    buf_printf(str, "Hex: 0x%x\n", 0x12345678);
+    assert(strcmp(str, "One: 1\nHex: 0x12345678\n") == 0);
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Arena allocator
