@@ -21,6 +21,11 @@ void* ast_dup(const void* src, size_t size)
 
 #define AST_DUP(x) ast_dup(x, num_##x * sizeof(*x))
 
+NoteList note_list(Note* notes, size_t num_notes)
+{
+    return (NoteList){AST_DUP(notes), num_notes};    
+}
+
 StmtList stmt_list(SrcPos pos, Stmt** stmts, size_t num_stmts)
 {
     return (StmtList) { pos, AST_DUP(stmts), num_stmts };
@@ -60,12 +65,13 @@ Typespec* typespec_array(SrcPos pos, Typespec* elem, Expr* size)
 	return type;
 }
 
-Typespec* typespec_func(SrcPos pos, Typespec** args, size_t num_args, Typespec* ret)
+Typespec* typespec_func(SrcPos pos, Typespec** args, size_t num_args, Typespec* ret, bool variadic)
 {
 	Typespec* type = typespec_new(TYPESPEC_FUNC, pos);
     type->func.args = AST_DUP(args);
     type->func.num_args = num_args;
     type->func.ret = ret;
+    type->func.variadic = variadic;
 	return type;
 }
 
@@ -88,6 +94,24 @@ Decl* decl_new(DeclKind kind, SrcPos pos, const char* name)
     decl->pos = pos;
     decl->name = name;
     return decl;
+}
+
+Note* get_decl_note(Decl* decl, const char* name)
+{
+    for (size_t i = 0; i < decl->notes.num_notes; i++)
+    {
+        Note* note = decl->notes.notes + i;
+        if (note->name == name)
+        {
+            return note;
+        }
+    }
+    return NULL;
+}
+
+bool is_decl_foreign(Decl* decl)
+{
+    return get_decl_note(decl, foreign_name) != NULL;
 }
 
 Decl* decl_enum(SrcPos pos, const char* name, EnumItem* items, size_t num_items)
@@ -131,12 +155,14 @@ Decl* decl_var(SrcPos pos, const char* name, Typespec* type, Expr* expr)
     return decl;
 }
 
-Decl* decl_func(SrcPos pos, const char* name, FuncParam* params, size_t num_params, Typespec* ret_type, StmtList block)
+Decl* decl_func(SrcPos pos, const char* name, FuncParam* params, size_t num_params, 
+                Typespec* ret_type, bool variadic, StmtList block)
 {
     Decl* decl = decl_new(DECL_FUNC, pos, name);
     decl->func.params = AST_DUP(params);
     decl->func.num_params = num_params;
     decl->func.ret_type = ret_type;
+    decl->func.variadic = variadic;
     decl->func.block = block;
     return decl;
 }
