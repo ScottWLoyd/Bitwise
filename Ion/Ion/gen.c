@@ -200,6 +200,10 @@ void gen_func_decl(Decl* decl)
             genf("%s", typespec_to_cdecl(param.type, param.name));
         }
     }
+    if (decl->func.variadic)
+    {
+        genf(", ...");
+    }
     genf(")");
 }
 

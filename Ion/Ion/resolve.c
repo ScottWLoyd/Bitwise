@@ -1577,7 +1577,7 @@ Operand resolve_expr_binary(Expr* expr)
         case TOKEN_AND:
         case TOKEN_XOR:
         case TOKEN_OR:
-            if (!is_integer_type(left.type) && is_integer_type(right.type))
+            if (is_integer_type(left.type) && is_integer_type(right.type))
             {
                 return resolve_binary_arithmetic_op(op, left, right);
             }

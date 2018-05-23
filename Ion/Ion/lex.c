@@ -167,6 +167,8 @@ const char* token_kind_names[] = {
 	[TOKEN_FLOAT] = "float",
 	[TOKEN_STR] = "string",
 	[TOKEN_NAME] = "name",
+    [TOKEN_NEG] = "~",
+    [TOKEN_NOT] = "!",
 	[TOKEN_MUL] = "*",
 	[TOKEN_DIV] = "/",
 	[TOKEN_MOD] = "%",
@@ -529,7 +531,6 @@ repeat:
             scan_str();
         } break;
         case '.': {
-            scan_float();
             if (isdigit(stream[1]))
             {
                 scan_float();
@@ -542,6 +543,7 @@ repeat:
             else
             {
                 token.kind = TOKEN_DOT;
+                stream++;
             }
         } break;
         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': {

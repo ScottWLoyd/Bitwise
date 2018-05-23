@@ -17,7 +17,7 @@ const N = (:char)42 + 8 != 0
 typedef A = int[1 + 2*sizeof(h())]
 
 func h(): uchar {
-    Vector{x=1, y=2}.x = 42;
+    //Vector{x=1, y=2}.x = 42;
     p := &int{0};
     x := uint{1} + long{2};
     y := +c;
@@ -167,5 +167,5 @@ func main(argc: int, argv: char**): int {
     printf("You wrote '%c'\n", c);
     va_test(1);
     va_test(1, 2);
-    //return 0;
+    return 0;
 }
