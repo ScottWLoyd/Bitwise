@@ -423,6 +423,24 @@ const char* str_intern(const char* str)
     return str_intern_range(str, str + strlen(str));
 }
 
+// Value union
+
+typedef union Val {
+    bool b;
+    char c;
+    unsigned char uc;
+    signed char sc;
+    short s;
+    unsigned short us;
+    int i;
+    unsigned u;
+    long l;
+    unsigned long ul;
+    long long ll;
+    unsigned long long ull;
+    uintptr_t p;
+} Val;
+
 void intern_test(void)
 {
     char a[] = "hello";

@@ -55,14 +55,14 @@ void print_typespec(Typespec* type)
             break;
         case TYPESPEC_ARRAY:
             printf("(array ");
-            print_typespec(t->array.elem);
+            print_typespec(t->base);
             printf(" ");
-            print_expr(t->array.size);
+            print_expr(t->num_elems);
             printf(")");
             break;
         case TYPESPEC_PTR:
             printf("(ptr ");
-            print_typespec(t->ptr.elem);
+            print_typespec(t->base);
             printf(")");
             break;
         default:
@@ -77,10 +77,10 @@ void print_expr(Expr* expr)
     {
         case EXPR_NONE: assert(0); break;
         case EXPR_INT:
-            printf("%d", expr->int_val);
+            printf("%llu", expr->int_lit.val);
             break;
         case EXPR_FLOAT:
-            printf("%f", expr->float_val);
+            printf("%f", expr->float_lit.val);
             break;
         case EXPR_STR:
             printf("\"%s\"", expr->str_val);

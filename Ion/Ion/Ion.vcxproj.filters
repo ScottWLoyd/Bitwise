@@ -42,6 +42,9 @@
     <ClCompile Include="ion.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="type.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="syntax.txt" />
@@ -56,6 +59,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="test1.ion">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="test2.ion">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
