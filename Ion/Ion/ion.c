@@ -39,12 +39,6 @@ const char* ion_compile_str(const char* str)
     return result;
 }
 
-void ion_test(void)
-{
-    bool b = ion_compile_file("test1.ion");
-    assert(b);
-}
-
 int ion_main(int argc, char** args)
 {
     if (argc < 2)

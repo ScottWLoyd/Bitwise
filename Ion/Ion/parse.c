@@ -11,7 +11,7 @@ Typespec* parse_type_func_param(void)
     {
         if (type->kind != TYPESPEC_NAME)
         {
-            syntax_error("Colons in parameters of func types must be preceded by names");
+            error_here("Colons in parameters of func types must be preceded by names");
         }
         type = parse_type();
     }
@@ -33,7 +33,7 @@ Typespec* parse_type_func(void)
 			{
 				if (has_varargs)
 				{
-					syntax_error("Multiple ellipsis instances in function type");
+					error_here("Multiple ellipsis instances in function type");
 				}
                 has_varargs = true;
 			}
@@ -41,7 +41,7 @@ Typespec* parse_type_func(void)
 			{
 				if (has_varargs)
 				{
-					syntax_error("Ellipsis must be last parameter in function type");
+					error_here("Ellipsis must be last parameter in function type");
 				}
 				buf_push(args, parse_type_func_param());
 			}
@@ -178,8 +178,9 @@ Expr* parse_expr_operand(void)
 	else if (is_token(TOKEN_STR))
 	{
 		const char* str = token.str_val;
+        TokenMod mod = token.mod;
 		next_token();
-		return expr_str(pos, str);
+		return expr_str(pos, str, mod);
 	}
 	else if (is_token(TOKEN_NAME))
 	{
@@ -538,7 +539,7 @@ Stmt* parse_stmt_for(SrcPos pos)
 		next = parse_simple_stmt();
 		if (next->kind == STMT_INIT)
 		{
-			syntax_error("Init statements not allowed in for-statement's next clause");
+			error_here("Init statements not allowed in for-statement's next clause");
 		}
 	}
 	expect_token(TOKEN_RPAREN);
@@ -565,7 +566,7 @@ SwitchCase parse_stmt_switch_case(void)
 			next_token();
 			if (is_default)
 			{
-				syntax_error("Duplicate default labels in same switch clause");
+				error_here("Duplicate default labels in same switch clause");
 			}
 			is_default = true;
 		}
@@ -782,7 +783,7 @@ Decl* parse_decl_func(SrcPos pos)
 			{
 				if (has_varargs)
 				{
-					syntax_error("Multiple ellipsis in function declaration");
+					error_here("Multiple ellipsis in function declaration");
 				}
                 has_varargs = true;
 			}
@@ -790,7 +791,7 @@ Decl* parse_decl_func(SrcPos pos)
 			{
 				if (has_varargs)
 				{
-					syntax_error("Ellipsis must be last parameter in function declaration");
+					error_here("Ellipsis must be last parameter in function declaration");
 				}
 				buf_push(params, parse_decl_func_param());
 			}
@@ -855,14 +856,14 @@ Decl* parse_decl_opt(void)
 
 Decl* parse_decl(void)
 {
-	NoteList notes = parse_note_list();
-   Decl* decl = parse_decl_opt();
-   if (!decl)
-   {
-      fatal_error_here("Expected declaraion keyword, got %s", token_info());
-   }
-   decl->notes = notes;
-   return decl;
+    NoteList notes = parse_note_list();
+    Decl* decl = parse_decl_opt();
+    if (!decl)
+    {
+        fatal_error_here("Expected declaraion keyword, got %s", token_info());
+    }
+    decl->notes = notes;
+    return decl;
 }
 
 DeclSet* parse_file(void)
@@ -875,37 +876,4 @@ DeclSet* parse_file(void)
         buf_push(decls, decl);
     }
     return decl_set(decls, buf_len(decls));
-}
-
-void parse_test(void)
-{
-    const char* decls[] = {
-        "var x: char[256] = {1, 2, 3, ['a'] = 4}",
-        "struct Vector { x, y: float; }",
-        "var v = Vector{1.0, -1.0}",
-        "var v: Vector = {1.0, -1.0}",
-        "const y = sizeof(:int*[3])",
-        "const y = sizeof(1+3)",
-        "var x = b == 1 ? 1+2 : 3-4",
-        "func fact(n: int): int { p := 1; for (i := 1; i <= n; i++) { p *= i; } return p; }",
-        "func fact(n: int): int { trace(\"fact\"); if (n == 0) { return 1; } else { return n * fact(n-1); } }",
-        "var foo = a ? a&b + c<<d + e*f == +u-v-w + *g/h(x,y) + -i%k[x] && m <= n*(p+q)/r : 0",
-        "func f(x: int): bool { switch(x) { case 0: case 1: return true; case 2: default: return false; } }",
-        "enum Color { RED=3, GREEN, BLUE=0 }",
-        "const pi = 3.14",
-        "union IntOrFloat { i: int; f: float; }",
-        "typedef Vectors = Vector[1+2]",
-        "func f() { do { print(42); } while(1); }",
-        "typedef T = (func(int):int)[16]",
-        "func f() { enum E { A, B, C } return; }",
-        "func f() { if (1) { return 1; } else if (2) { return 2; } else { return 3; } }",
-	};
-
-	for (const char** it = decls; it != decls + sizeof(decls) / sizeof(*decls); it++)
-	{
-		init_stream(NULL, *it);
-		Decl* decl = parse_decl();
-		print_decl(decl);
-		printf("\n");
-	}
 }

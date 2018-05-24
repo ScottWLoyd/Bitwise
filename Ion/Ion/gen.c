@@ -70,8 +70,13 @@ void gen_char(char c)
     }
 }
 
-void gen_str(const char* str)
+void gen_str(const char* str, bool multiline)
 {
+    if (multiline)
+    {
+        gen_indent++;
+        genln();
+    }
     genf("\"");
     while (*str)
     {
@@ -89,6 +94,11 @@ void gen_str(const char* str)
             if (char_to_escape[(unsigned char)*str])
             {
                 genf("\\%c", char_to_escape[(unsigned char)*str]);
+                if (str[0] == '\n' && str[1])
+                {
+                    genf("\"");
+                    genlnf("\"");
+                }
             }
             else
             {
@@ -99,6 +109,10 @@ void gen_str(const char* str)
         }
     }
     genf("\"");
+    if (multiline)
+    {
+        gen_indent--;
+    }
 }
 
 void gen_sync_pos(SrcPos pos)
@@ -108,7 +122,7 @@ void gen_sync_pos(SrcPos pos)
         genlnf("#line %d", pos.line);
         if (gen_pos.name != pos.name) {
             genf(" ");
-            gen_str(pos.name);
+            gen_str(pos.name, false);
         }
         gen_pos = pos;
     }
@@ -280,6 +294,10 @@ void gen_forward_decls(void)
         {
             continue;
         }
+        if (is_decl_foreign(decl))
+        {
+            continue;
+        }
         switch (decl->kind)
         {
             case DECL_STRUCT:
@@ -379,7 +397,7 @@ void gen_expr(Expr* expr)
             genf("%f%s", expr->float_lit.val, expr->float_lit.suffix == SUFFIX_D ? "" : "f");
             break;
         case EXPR_STR:
-            gen_str(expr->str_val);
+            gen_str(expr->str_lit.val, expr->str_lit.mod == MOD_MULTILINE);
             break;
         case EXPR_NAME:
             genf("%s", expr->name);
@@ -652,6 +670,19 @@ void gen_stmt(Stmt* stmt)
     }
 }
 
+void gen_enum(Decl* decl)
+{
+    assert(decl->kind == DECL_ENUM);
+    genlnf("typedef enum %s {", decl->name);
+    gen_indent++;
+    for (size_t i = 0; i < decl->enum_decl.num_items; i++)
+    {
+        genlnf("%s,", decl->enum_decl.items[i].name);
+    }
+    gen_indent--;
+    genlnf("} %s;", decl->name);
+}
+
 void gen_decl(Sym* sym)
 {
     Decl* decl = sym->decl;
@@ -694,6 +725,9 @@ void gen_decl(Sym* sym)
         case DECL_TYPEDEF:
             genlnf("typedef %s;", typespec_to_cdecl(decl->typedef_decl.type, sym->name));
             break;
+        case DECL_ENUM:
+            gen_enum(decl);
+            break;
         default:
             assert(0);
             break;
@@ -707,20 +741,6 @@ void gen_sorted_decls(void)
     {
         gen_decl(sorted_syms[i]);
     }
-}
-
-void cdecl_test(void)
-{
-    char* cdecl1 = type_to_cdecl(type_int, "x");
-    char* cdecl2 = type_to_cdecl(type_ptr(type_int), "x");
-    char* cdecl3 = type_to_cdecl(type_array(type_int, 10), "x");
-    char* cdecl4 = type_to_cdecl(type_func((Type*[]) {type_int}, 1, type_int, false), "x");
-    char* cdecl5 = type_to_cdecl(type_array(type_func((Type*[]) { type_int }, 1, type_int, false), 10), "x");
-    char* cdecl6 = type_to_cdecl(type_func((Type*[]) { type_ptr(type_int) }, 1, type_int, false), "x");
-    Type* type1 = type_func((Type*[]){type_array(type_int, 10)}, 1, type_int, false);
-    char* cdecl7 = type_to_cdecl(type1, "x");
-    char* cdecl8 = type_to_cdecl(type_func(NULL, 0, type1, false), "x");
-    char* cdecl9 = type_to_cdecl(type_func(NULL, 0, type_array(type_func(NULL, 0, type_int, false), 10), false), "x");
 }
 
 void gen_func_defs(void)

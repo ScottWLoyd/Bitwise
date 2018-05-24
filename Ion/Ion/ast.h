@@ -172,7 +172,10 @@ typedef struct Expr {
             double val;
             TokenSuffix suffix;
         } float_lit;
-        const char* str_val;
+        struct {
+            const char* val;
+            TokenMod mod;
+        } str_lit;
         const char* name;
 		Expr* sizeof_expr;
 		Typespec* sizeof_type;

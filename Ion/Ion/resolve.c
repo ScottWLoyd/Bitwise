@@ -5,7 +5,6 @@ typedef enum SymKind {
     SYM_CONST,
     SYM_FUNC,
     SYM_TYPE,
-    SYM_ENUM_CONST,
 } SymKind;
 
 typedef enum SymState {
@@ -27,6 +26,7 @@ enum {
     MAX_LOCAL_SYMS = 1024
 };
 
+Sym** sorted_syms;
 Map global_syms_map;
 Sym** global_syms_buf;
 Sym local_syms[MAX_LOCAL_SYMS];
@@ -72,11 +72,6 @@ Sym* sym_decl(Decl* decl)
         sym->type = type_incomplete(sym);
     }
     return sym;
-}
-
-Sym* sym_enum_const(const char* name, Decl* decl)
-{
-    return sym_new(SYM_ENUM_CONST, name, decl);
 }
 
 Sym* sym_get_local(const char* name)
@@ -138,21 +133,6 @@ void sym_global_put(Sym* sym)
     buf_push(global_syms_buf, sym);
 }
 
-Sym* sym_global_decl(Decl* decl)
-{
-    Sym* sym = sym_decl(decl);
-    sym_global_put(sym);
-    decl->sym = sym;
-    if (decl->kind == DECL_ENUM)
-    {
-        for (size_t i = 0; i < decl->enum_decl.num_items; i++)
-        {
-            sym_global_put(sym_enum_const(decl->enum_decl.items[i].name, decl));
-        }
-    }
-    return sym;
-}
-
 void sym_global_type(const char* name, Type* type)
 {
     Sym* sym = sym_new(SYM_TYPE, str_intern(name), NULL);
@@ -185,6 +165,29 @@ void sym_global_func(const char* name, Type* type)
     sym->state = SYM_RESOLVED;
     sym->type = type;
     sym_global_put(sym);
+}
+
+Sym* sym_global_decl(Decl* decl)
+{
+    Sym* sym = sym_decl(decl);
+    sym_global_put(sym);
+    decl->sym = sym;
+    if (decl->kind == DECL_ENUM)
+    {
+        sym->state = SYM_RESOLVED;
+        sym->type = type_enum(sym);
+        buf_push(sorted_syms, sym);
+        for (int i = 0; i < decl->enum_decl.num_items; i++)
+        {
+            EnumItem item = decl->enum_decl.items[i];
+            if (item.init)
+            {
+                fatal_error(item.pos, "Explicit enum constant initializers are not currently supported");
+            }
+            sym_global_const(item.name, sym->type, (Val) { .i = i });
+        }
+    }
+    return sym;
 }
 
 typedef struct Operand {
@@ -255,6 +258,7 @@ bool is_null_ptr(Operand operand);
             operand->val.us = (unsigned short)operand->val.t; \
             break; \
         case TYPE_INT: \
+        case TYPE_ENUM: \
             operand->val.i = (int)operand->val.t; \
             break; \
         case TYPE_UINT: \
@@ -343,11 +347,11 @@ bool is_castable(Operand* operand, Type* dest)
     {
         return true;
     }
-    else if (is_arithmetic_type(dest))
+    else if (is_integer_type(dest))
     {
         return is_ptr_type(src);
     }
-    else if (is_arithmetic_type(src))
+    else if (is_integer_type(src))
     {
         return is_ptr_type(dest);
     }
@@ -389,6 +393,7 @@ bool cast_operand(Operand* operand, Type* type)
                     CASE(TYPE_SHORT, s)
                     CASE(TYPE_USHORT, us)
                     CASE(TYPE_INT, i)
+                    CASE(TYPE_ENUM, i)
                     CASE(TYPE_UINT, u)
                     CASE(TYPE_LONG, l)
                     CASE(TYPE_ULONG, ul)
@@ -443,6 +448,7 @@ void promote_operand(Operand* operand)
         case TYPE_UCHAR:
         case TYPE_SHORT:
         case TYPE_USHORT:
+        case TYPE_ENUM:
             cast_operand(operand, type_int);
             break;
         default:
@@ -608,8 +614,6 @@ Type* resolve_typespec(Typespec* typespec)
     return result;
 }
 
-Sym** sorted_syms;
-
 void complete_type(Type* type)
 {
     if (type->kind == TYPE_COMPLETING)
@@ -759,6 +763,8 @@ bool resolve_stmt_block(StmtList block, Type* ret_type)
     return returns;
 }
 
+Operand resolve_expr_binary_op(TokenKind op, const char* op_name, SrcPos pos, Operand left, Operand right);
+
 void resolve_stmt_assign(Stmt* stmt)
 {
     assert(stmt->kind == STMT_ASSIGN);
@@ -777,10 +783,44 @@ void resolve_stmt_assign(Stmt* stmt)
     }
     if (stmt->assign.right)
     {
+        const char* assign_op_name = token_kind_name(stmt->assign.op);
+        TokenKind binary_op = assign_token_to_binary_token[stmt->assign.op];
         Operand right = resolve_expected_expr_rvalue(stmt->assign.right, left.type);
-        if (!convert_operand(&right, left.type))
+        Operand result;
+        if (stmt->assign.op == TOKEN_ASSIGN)
         {
-            fatal_error(stmt->pos, "Invalid type in assignment statement");
+            result = right;
+        }
+        else if (stmt->assign.op == TOKEN_ADD_ASSIGN || stmt->assign.op == TOKEN_SUB_ASSIGN)
+        {
+            if (left.type->kind == TYPE_PTR && is_integer_type(right.type))
+            {
+                result = operand_rvalue(left.type);
+            }
+            else if (is_arithmetic_type(left.type) && is_arithmetic_type(right.type))
+            {
+                result = resolve_expr_binary_op(binary_op, assign_op_name, stmt->pos, left, right);
+            }
+            else
+            {
+                fatal_error(stmt->pos, "Invalid operand types for %s", assign_op_name);
+            }
+        }
+        else
+        {
+            result = resolve_expr_binary_op(binary_op, assign_op_name, stmt->pos, left, right);
+        }
+        if (!convert_operand(&result, left.type))
+        {
+            fatal_error(stmt->pos, "Invalid type in assignment");
+        }
+    }
+    else
+    {
+        assert(stmt->assign.op == TOKEN_INC || stmt->assign.op == TOKEN_DEC);
+        if (!(is_integer_type(left.type) || is_ptr_type(left.type)))
+        {
+            fatal_error(stmt->pos, "%s only valid for integer  and pointer types", token_kind_name(stmt->assign.op));
         }
     }
 }
@@ -1317,34 +1357,29 @@ Operand resolve_binary_arithmetic_op(TokenKind op, Operand left, Operand right)
     return resolve_binary_op(op, left, right);
 }
 
-Operand resolve_expr_binary(Expr* expr)
-{
-    assert(expr->kind == EXPR_BINARY);
-    Operand left = resolve_expr_rvalue(expr->binary.left);
-    Operand right = resolve_expr_rvalue(expr->binary.right);
-    TokenKind op = expr->binary.op;
-    const char* op_name = token_kind_name(op);
+Operand resolve_expr_binary_op(TokenKind op, const char* op_name, SrcPos pos, Operand left, Operand right)
+{    
     switch (op)
     {
         case TOKEN_MUL:
         case TOKEN_DIV:
             if (!is_arithmetic_type(left.type))
             {
-                fatal_error(expr->binary.left->pos, "Left operand of %s must have arithmetic type", op_name);
+                fatal_error(pos, "Left operand of %s must have arithmetic type", op_name);
             }
             if (!is_arithmetic_type(right.type))
             {
-                fatal_error(expr->binary.right->pos, "Right operand of %s must have arithmetic type", op_name);
+                fatal_error(pos, "Right operand of %s must have arithmetic type", op_name);
             }
             return resolve_binary_arithmetic_op(op, left, right);
         case TOKEN_MOD:
             if (!is_integer_type(left.type))
             {
-                fatal_error(expr->binary.left->pos, "Left operand of %% must have arithmetic type");
+                fatal_error(pos, "Left operand of %% must have arithmetic type");
             }
             if (!is_integer_type(right.type))
             {
-                fatal_error(expr->binary.right->pos, "Right operand of %% must have arithmetic type");
+                fatal_error(pos, "Right operand of %% must have arithmetic type");
             }
             return resolve_binary_arithmetic_op(op, left, right);
         case TOKEN_ADD:
@@ -1362,7 +1397,7 @@ Operand resolve_expr_binary(Expr* expr)
             }
             else
             {
-                fatal_error(expr->pos, "Operands of + must both have arithmetic type, or pointer and integer type");
+                fatal_error(pos, "Operands of + must both have arithmetic type, or pointer and integer type");
             }
             break;
         case TOKEN_SUB:
@@ -1378,13 +1413,13 @@ Operand resolve_expr_binary(Expr* expr)
             {
                 if (left.type->base != right.type->base)
                 {
-                    fatal_error(expr->pos, "Cannot subtract pointers to different types");
+                    fatal_error(pos, "Cannot subtract pointers to different types");
                 }
                 return operand_rvalue(type_ssize);
             }
             else
             {
-                fatal_error(expr->pos, "Operands of - must both have arithmetic type, pointer and integer type, or compatible pointer types");
+                fatal_error(pos, "Operands of - must both have arithmetic type, pointer and integer type, or compatible pointer types");
             }
             break;
         case TOKEN_LSHIFT:
@@ -1411,7 +1446,7 @@ Operand resolve_expr_binary(Expr* expr)
             }
             else
             {
-                fatal_error(expr->pos, "Operands of %s must both have integer type", op_name);
+                fatal_error(pos, "Operands of %s must both have integer type", op_name);
             }
             break;
         case TOKEN_LT:
@@ -1430,7 +1465,7 @@ Operand resolve_expr_binary(Expr* expr)
             {
                 if (left.type->base != right.type->base)
                 {
-                    fatal_error(expr->pos, "Cannot compare pointers to different types");
+                    fatal_error(pos, "Cannot compare pointers to different types");
                 }
                 return operand_rvalue(type_int);
             }
@@ -1440,7 +1475,7 @@ Operand resolve_expr_binary(Expr* expr)
             }
             else
             {
-                fatal_error(expr->pos, "Operands of %s must be arithmetic types or compatible pointer types", op_name);
+                fatal_error(pos, "Operands of %s must be arithmetic types or compatible pointer types", op_name);
             }
             break;
         case TOKEN_AND:
@@ -1452,7 +1487,7 @@ Operand resolve_expr_binary(Expr* expr)
             }
             else
             {
-                fatal_error(expr->pos, "Operands of %s must have arithmetic types", op_name);
+                fatal_error(pos, "Operands of %s must have arithmetic types", op_name);
             }
             break;
         case TOKEN_AND_AND:
@@ -1482,7 +1517,7 @@ Operand resolve_expr_binary(Expr* expr)
             }
             else
             {
-                fatal_error(expr->pos, "Operands of %s must have scalar types", op_name);
+                fatal_error(pos, "Operands of %s must have scalar types", op_name);
             }
             break;
         default:
@@ -1490,6 +1525,16 @@ Operand resolve_expr_binary(Expr* expr)
             break;
     }
     return (Operand) { 0 };
+}
+
+Operand resolve_expr_binary(Expr* expr)
+{
+    assert(expr->kind == EXPR_BINARY);
+    Operand left = resolve_expr_rvalue(expr->binary.left);
+    Operand right = resolve_expr_rvalue(expr->binary.right);
+    TokenKind op = expr->binary.op;
+    const char* op_name = token_kind_name(op);
+    return resolve_expr_binary_op(op, op_name, expr->pos, left, right);
 }
 
 int aggregate_field_index(Type* type, const char* name)
@@ -1628,11 +1673,11 @@ Operand resolve_expr_call(Expr* expr)
         }
         if (sym->kind == SYM_TYPE)
         {
+            Operand operand = resolve_expr_rvalue(expr->call.args[0]);
             if (expr->call.num_args != 1)
             {
                 fatal_error(expr->pos, "Type conversion operator takes 1 argument");
             }
-            Operand operand = resolve_expr_rvalue(expr->call.args[0]);
             if (!cast_operand(&operand, sym->type))
             {
                 fatal_error(expr->pos, "Invalid type cast");
@@ -2000,106 +2045,5 @@ void finalize_syms(void)
         {
             finalize_sym(sym);
         }
-    }
-}
-
-void resolve_test(void)
-{
-    Type* int_ptr = type_ptr(type_int);
-    assert(type_ptr(type_int) == int_ptr);
-    Type* float_ptr = type_ptr(type_float);
-    assert(type_ptr(type_float) == float_ptr);
-    assert(int_ptr != float_ptr);
-    Type* int_ptr_ptr = type_ptr(type_ptr(type_int));
-    assert(type_ptr(type_ptr(type_int)) == int_ptr_ptr);
-    Type* float4_array = type_array(type_float, 4);
-    assert(type_array(type_float, 4) == float4_array);
-    Type* float3_array = type_array(type_float, 3);
-    assert(type_array(type_float, 3) == float3_array);
-    assert(float3_array != float4_array);
-    Type* int_int_func = type_func(&type_int, 1, type_int, false);
-    assert(type_func(&type_int, 1, type_int, false) == int_int_func);
-    Type* int_func = type_func(NULL, 0, type_int, false);
-    assert(int_int_func != int_func);
-    assert(int_func == type_func(NULL, 0, type_int, false));
-
-    init_builtins();
-
-    const char* code[] = {
-        "union IntOrPtr { i: int; p: int*; }",
-        "var u1 = IntOrPtr{ i = 42 }",
-        "var u2 = IntOrPtr{ p = (:int*)42 }",
-        "var i: int",
-        "struct Vector { x, y : int; }",
-        "func f1() { v := Vector{1, 2}; j := i; i++; j++; v.x = 2*j; }",
-        "func f2(n: int): int { return 2*n; }",
-        "func f3(x: int): int { if (x) { return -x; } else if (x % 2 == 0) { return 42; } else { return -1; } }",
-        "func f4(n: int): int { for (i := 0; i< n; i++) { if (i % 3 == 0) { return n; } return 0; } }",
-        "func f5(x: int): int { switch(x) { case 0, 1: return 42; case 3: default: return -1; } }",
-        "func f6(n: int): int { p := 1; while(n) { p *= 2; n--; } return p; }",
-        "func f7(n: int): int { p := 1; do { p *= 2; n--; } while (n); return p; }",
-        "var a: int[3] = {1, 2, 3}",
-        "var b: int[4]",
-        "var p = &a[1]",
-        "var i = p[1]",
-        "var j = *p",
-        "const n = sizeof(a)",
-        "const m = sizeof(&a[0])",
-        "const l = sizeof(1 ? a : b)",
-        /*
-        "var pi = 3.14",
-        "var name = \"test\"",
-        "struct Vector { x, y: int; }",
-        "var v = Vector{1,2}",
-        "var i = 42",
-        "var p = (:void*)i",
-        "var j = (:int)p",
-        "var q = (:int*)j",
-        "const i = 42",
-        "const j = -i",
-        "const k = +i",
-        "const a = 1000/((2*3-5) << 1)",
-        "const b = !0",
-        "const c = ~1 + 1 == -1",
-        "var i = 42",
-        "const p = i ? 2 : 3",
-        "func add(v: Vector, w: Vector): Vector { return { v.x + w.x, v.y + w.y }; }",
-        "var v = add({1, 2}, {3,4})",        
-        "var v = Vector{1, 2}",
-        "union IntOrPtr { i: int; p: int*; }",
-        "var i = 42",
-        "var u = IntOrPtr{ i, &i}",
-        "const n = 1 + sizeof(p)",
-        "var p: T*",
-        "var u = *p",
-        "struct T { a: int[n]; }",
-        "var t: T",
-        "typedef S = int[n+m]",
-        "var r = &t.a",
-        "const m = sizeof(t.a)",
-        "var i = n + m",
-        "var q = &i",
-        */
-    };
-
-    for (size_t i = 0; i < sizeof(code) / sizeof(*code); i++)
-    {
-        init_stream(NULL, code[i]);
-        Decl* decl = parse_decl();
-        sym_global_decl(decl);
-    }
-    finalize_syms();
-    for (Sym** it = sorted_syms; it != buf_end(sorted_syms); it++)
-    {
-        Sym* sym = *it;
-        if (sym->decl)
-        {
-            print_decl(sym->decl);
-        }
-        else
-        {
-            printf("%s", sym->name);
-        }
-        printf("\n");
     }
 }

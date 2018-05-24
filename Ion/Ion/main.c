@@ -22,20 +22,11 @@
 #include "resolve.c"
 #include "gen.c"
 #include "ion.c"
-
-void main_test(void)
-{
-    common_test();
-    // lex_test();
-    // print_test();
-	// parse_test();
-	resolve_test();
-    // gen_test();
-    // ion_test();
-}
+#include "test.c"
 
 int main(int ArgCount, char** Args)
 {
     //main_test();
+    
     return ion_main(ArgCount, Args);
 }
