@@ -143,7 +143,7 @@ void parse_test(void) {
     }
 }
 
-void gen_cdecl_test(void) {
+void gen_cdecl_test(void) {	
 #if 0
     char *cdecl1 = type_to_cdecl(type_int, "x");
     char *cdecl2 = type_to_cdecl(type_ptr(type_int), "x");
@@ -159,27 +159,14 @@ void gen_cdecl_test(void) {
 }
 
 void resolve_test(void) {
-    Type *int_ptr = type_ptr(type_int);
-    assert(type_ptr(type_int) == int_ptr);
-    Type *float_ptr = type_ptr(type_float);
-    assert(type_ptr(type_float) == float_ptr);
-    assert(int_ptr != float_ptr);
-    Type *int_ptr_ptr = type_ptr(type_ptr(type_int));
-    assert(type_ptr(type_ptr(type_int)) == int_ptr_ptr);
-    Type *float4_array = type_array(type_float, 4);
-    assert(type_array(type_float, 4) == float4_array);
-    Type *float3_array = type_array(type_float, 3);
-    assert(type_array(type_float, 3) == float3_array);
-    assert(float4_array != float3_array);
-    Type *int_int_func = type_func(&type_int, 1, type_int, false);
-    assert(type_func(&type_int, 1, type_int, false) == int_int_func);
-    Type *int_func = type_func(NULL, 0, type_int, false);
-    assert(int_int_func != int_func);
-    assert(int_func == type_func(NULL, 0, type_int, false));
 
+	init_keywords();
     init_builtins();
 
     const char *code[] = {
+		"func test_bool() {	b := false; b = true; i := 0; }"
+		/*
+		"func f() { a: int const* = 0; }"
         "union IntOrPtr { i: int; p: int*; }",
         "var u1 = IntOrPtr{i = 42}",
         "var u2 = IntOrPtr{p = (:int*)42}",
@@ -192,7 +179,6 @@ void resolve_test(void) {
         "func f5(x: int): int { switch(x) { case 0, 1: return 42; case 3: default: return -1; } }",
         "func f6(n: int): int { p := 1; while (n) { p *= 2; n--; } return p; }",
         "func f7(n: int): int { p := 1; do { p *= 2; n--; } while (n); return p; }",
-        /*
         "var i: int",
         "func add(v: Vector, w: Vector): Vector { return {v.x + w.x, v.y + w.y}; }",
         "var a: int[256] = {1, 2, ['a'] = 42, [255] = 123}",
@@ -257,7 +243,7 @@ void resolve_test(void) {
     finalize_syms();
     for (Sym **it = sorted_syms; it != buf_end(sorted_syms); it++) {
         Sym *sym = *it;
-        if (sym->decl) {
+        if (sym->decl) {			
             print_decl(sym->decl);
         } else {
             printf("%s", sym->name);
@@ -267,7 +253,7 @@ void resolve_test(void) {
 }
 
 void main_test(void) {
-    common_test();
+    // common_test();
     // lex_test();
     // print_test();
     // parse_test();

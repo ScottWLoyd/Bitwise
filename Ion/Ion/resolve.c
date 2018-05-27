@@ -430,7 +430,7 @@ bool is_null_ptr(Operand operand)
     if (operand.is_const && (is_ptr_type(operand.type) || is_integer_type(operand.type)))
     {
         cast_operand(&operand, type_ullong);
-        return operand.val.ull = 0;
+        return operand.val.ull == 0;
     }
     else
     {
@@ -1260,7 +1260,7 @@ Operand resolve_expr_name(Expr* expr)
     Sym* sym = resolve_name(expr->name);
     if (!sym)
     {
-        fatal_error(expr->pos, "Unresolved name");
+        fatal_error(expr->pos, "Unresolved name '%s'", expr->name);
     }
     if (sym->kind == SYM_VAR)
     {

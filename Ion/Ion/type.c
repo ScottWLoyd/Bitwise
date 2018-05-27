@@ -148,7 +148,7 @@ bool is_signed_type(Type* type)
 
 const char* type_names[NUM_TYPE_KINDS] = {
     [TYPE_VOID] = "void",
-    [TYPE_BOOL] = "void",
+    [TYPE_BOOL] = "bool",
     [TYPE_CHAR] = "char",
     [TYPE_SCHAR] = "schar",
     [TYPE_UCHAR] = "uchar",

@@ -1,0 +1,38 @@
+@foreign
+func init(): bool {
+	return true;
+}
+
+@foreign
+struct Window {
+	sdl_window: void*;
+}
+
+@foreign
+struct int2 {
+	x, y: int;
+}
+
+@foreign
+func create_window(title: char const*, pos: int2, size: int2): Window* {
+	return NULL;
+}
+
+@foreign
+func destroy_window(window: Window*) {
+}
+
+@foreign
+struct Key {
+	bool down;
+	bool pressed;
+	bool released;
+}
+
+@foreign
+const NUM_KEYS = 256;
+
+@foreign
+func update() {
+
+}

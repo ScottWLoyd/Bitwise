@@ -7,7 +7,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Ion", "Ion\Ion.vcxproj", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_project", "test_project\test_project.vcxproj", "{165653A3-480A-4D30-BF5B-80877E646EA6}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "master-ion", "master-ion\master-ion.vcxproj", "{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "noir", "noir\noir.vcxproj", "{08017240-A2D2-40EC-A6A4-E3601D2620F3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,16 +39,16 @@ Global
 		{165653A3-480A-4D30-BF5B-80877E646EA6}.Release|x64.Build.0 = Release|x64
 		{165653A3-480A-4D30-BF5B-80877E646EA6}.Release|x86.ActiveCfg = Release|Win32
 		{165653A3-480A-4D30-BF5B-80877E646EA6}.Release|x86.Build.0 = Release|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Debug|x64.ActiveCfg = Debug|x64
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Debug|x64.Build.0 = Debug|x64
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Debug|x86.ActiveCfg = Debug|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Debug|x86.Build.0 = Debug|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Release|Any CPU.ActiveCfg = Release|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Release|x64.ActiveCfg = Release|x64
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Release|x64.Build.0 = Release|x64
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Release|x86.ActiveCfg = Release|Win32
-		{4CDD7269-2D1B-4B90-BEE8-9A9E0BF912EC}.Release|x86.Build.0 = Release|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Debug|x64.ActiveCfg = Debug|x64
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Debug|x64.Build.0 = Debug|x64
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Debug|x86.ActiveCfg = Debug|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Debug|x86.Build.0 = Debug|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Release|Any CPU.ActiveCfg = Release|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Release|x64.ActiveCfg = Release|x64
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Release|x64.Build.0 = Release|x64
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Release|x86.ActiveCfg = Release|Win32
+		{08017240-A2D2-40EC-A6A4-E3601D2620F3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

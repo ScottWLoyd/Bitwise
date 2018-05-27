@@ -58,7 +58,7 @@ void gen_char(char c)
 {
     if (char_to_escape[(unsigned char)c])
     {
-        genf(";\\%c'", char_to_escape[(unsigned char)c]);
+        genf("'\\%c'", char_to_escape[(unsigned char)c]);
     }
     else if (isprint(c))
     {
@@ -204,6 +204,10 @@ const char* gen_expr_str(Expr* expr)
 
 char* typespec_to_cdecl(Typespec* typespec, const char* str)
 {
+	if (typespec->name && (typespec->name, "test_bool_a") == 0)
+	{
+		int i = 0;
+	}
     switch (typespec->kind)
     {
         case TYPESPEC_NAME:
